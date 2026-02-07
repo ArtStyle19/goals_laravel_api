@@ -151,38 +151,38 @@ class TaskController extends Controller
     }
 
     /**
-     * Lock task to prevent rescheduling.
+     * Lock task to prevent rescheduling. (old eplan)
      */
-    public function lock(Request $request, Task $task): JsonResponse
-    {
-        // Ensure user owns this task's goal
-        if ($task->goal->user_id !== $request->user()->id) {
-            return response()->json(['message' => 'No autorizado'], 403);
-        }
+    // public function lock(Request $request, Task $task): JsonResponse
+    // {
+    //     // Ensure user owns this task's goal
+    //     if ($task->goal->user_id !== $request->user()->id) {
+    //         return response()->json(['message' => 'No autorizado'], 403);
+    //     }
 
-        $task->lock();
+    //     $task->lock();
 
-        return response()->json([
-            'message' => 'Tarea bloqueada',
-            'task' => $task->fresh(),
-        ]);
-    }
+    //     return response()->json([
+    //         'message' => 'Tarea bloqueada',
+    //         'task' => $task->fresh(),
+    //     ]);
+    // }
 
-    /**
-     * Unlock task to allow rescheduling.
-     */
-    public function unlock(Request $request, Task $task): JsonResponse
-    {
-        // Ensure user owns this task's goal
-        if ($task->goal->user_id !== $request->user()->id) {
-            return response()->json(['message' => 'No autorizado'], 403);
-        }
+    // /**
+    //  * Unlock task to allow rescheduling.
+    //  */
+    // public function unlock(Request $request, Task $task): JsonResponse
+    // {
+    //     // Ensure user owns this task's goal
+    //     if ($task->goal->user_id !== $request->user()->id) {
+    //         return response()->json(['message' => 'No autorizado'], 403);
+    //     }
 
-        $task->unlock();
+    //     $task->unlock();
 
-        return response()->json([
-            'message' => 'Tarea desbloqueada',
-            'task' => $task->fresh(),
-        ]);
-    }
+    //     return response()->json([
+    //         'message' => 'Tarea desbloqueada',
+    //         'task' => $task->fresh(),
+    //     ]);
+    // }
 }

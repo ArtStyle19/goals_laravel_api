@@ -1,0 +1,289 @@
+<?php
+
+// use App\Models\Goal;
+// use App\Models\Task;
+// use App\Models\User;
+// use App\Services\ReplanService;
+// use App\Services\SchedulingService;
+// use Carbon\Carbon;
+// use Illuminate\Foundation\Testing\RefreshDatabase;
+
+// uses(RefreshDatabase::class);
+
+// describe('ReplanService', function () {
+
+//     beforeEach(function () {
+//         // Freeze time for predictable testing
+//         Carbon::setTestNow(Carbon::parse('2026-02-05 08:00:00')); // Thursday
+
+//         $this->user = User::factory()->create();
+//         $this->schedulingService = app(SchedulingService::class);
+//         $this->replanService = app(ReplanService::class);
+//     });
+
+//     afterEach(function () {
+//         Carbon::setTestNow();
+//     });
+
+//     describe('replan', function () {
+
+//         it('reschedules pending tasks to new slots', function () {
+//             // Create goal with Monday availability
+//             $goal = Goal::create([
+//                 'user_id' => $this->user->id,
+//                 'title' => 'Learn Testing',
+//                 'deadline' => '2026-03-01',
+//                 'session_duration_minutes' => 60,
+//                 'availability_rules' => [
+//                     ['day' => 'monday', 'start' => '09:00', 'end' => '12:00'], // 3 sessions
+//                 ],
+//                 'status' => Goal::STATUS_ACTIVE,
+//             ]);
+
+//             // Create 3 tasks with old dates
+//             $tasks = [];
+//             for ($i = 1; $i <= 3; $i++) {
+//                 $tasks[] = Task::create([
+//                     'goal_id' => $goal->id,
+//                     'title' => "Task $i",
+//                     'order' => $i,
+//                     'scheduled_at' => '2026-02-02 09:00:00', // Old date
+//                     'status' => Task::STATUS_SCHEDULED,
+//                 ]);
+//             }
+
+//             // Replan
+//             $result = $this->replanService->replan($goal);
+
+//             expect($result['success'])->toBeTrue();
+//             expect($result['rescheduled_count'])->toBe(3);
+
+//             // Verify new dates are in the future
+//             foreach ($goal->fresh()->tasks as $task) {
+//                 expect(Carbon::parse($task->scheduled_at)->gt(Carbon::now()))->toBeTrue();
+//             }
+//         });
+
+//         it('preserves completed tasks', function () {
+//             $goal = Goal::create([
+//                 'user_id' => $this->user->id,
+//                 'title' => 'Learn Testing',
+//                 'deadline' => '2026-03-01',
+//                 'session_duration_minutes' => 60,
+//                 'availability_rules' => [
+//                     ['day' => 'monday', 'start' => '09:00', 'end' => '12:00'],
+//                 ],
+//                 'status' => Goal::STATUS_ACTIVE,
+//             ]);
+
+//             $originalDate = '2026-02-02 09:00:00';
+
+//             // Create one completed task
+//             $completedTask = Task::create([
+//                 'goal_id' => $goal->id,
+//                 'title' => 'Completed Task',
+//                 'order' => 1,
+//                 'scheduled_at' => $originalDate,
+//                 'status' => Task::STATUS_COMPLETED,
+//                 'completed_at' => now(),
+//             ]);
+
+//             // Create one pending task
+//             $pendingTask = Task::create([
+//                 'goal_id' => $goal->id,
+//                 'title' => 'Pending Task',
+//                 'order' => 2,
+//                 'scheduled_at' => $originalDate,
+//                 'status' => Task::STATUS_SCHEDULED,
+//             ]);
+
+//             // Replan
+//             $result = $this->replanService->replan($goal);
+
+//             // Completed task should NOT be moved
+//             expect($completedTask->fresh()->scheduled_at->toDateTimeString())->toBe($originalDate);
+
+//             // Pending task should be moved to new date
+//             expect($pendingTask->fresh()->scheduled_at->toDateTimeString())->not->toBe($originalDate);
+//             expect($result['rescheduled_count'])->toBe(1);
+//         });
+
+//         it('preserves locked tasks', function () {
+//             $goal = Goal::create([
+//                 'user_id' => $this->user->id,
+//                 'title' => 'Learn Testing',
+//                 'deadline' => '2026-03-01',
+//                 'session_duration_minutes' => 60,
+//                 'availability_rules' => [
+//                     ['day' => 'monday', 'start' => '09:00', 'end' => '12:00'],
+//                 ],
+//                 'status' => Goal::STATUS_ACTIVE,
+//             ]);
+
+//             $originalDate = '2026-02-09 09:00:00'; // Monday
+
+//             // Create one locked task
+//             $lockedTask = Task::create([
+//                 'goal_id' => $goal->id,
+//                 'title' => 'Locked Task',
+//                 'order' => 1,
+//                 'scheduled_at' => $originalDate,
+//                 'status' => Task::STATUS_SCHEDULED,
+//                 'is_locked' => true,
+//             ]);
+
+//             // Create one pending task
+//             $pendingTask = Task::create([
+//                 'goal_id' => $goal->id,
+//                 'title' => 'Pending Task',
+//                 'order' => 2,
+//                 'scheduled_at' => '2026-02-02 09:00:00',
+//                 'status' => Task::STATUS_SCHEDULED,
+//                 'is_locked' => false,
+//             ]);
+
+//             // Replan
+//             $result = $this->replanService->replan($goal);
+
+//             // Locked task should NOT be moved
+//             expect($lockedTask->fresh()->scheduled_at->toDateTimeString())->toBe($originalDate);
+
+//             // Pending task should be moved
+//             expect($result['rescheduled_count'])->toBe(1);
+//         });
+
+//         it('returns warning when not enough slots for all tasks', function () {
+//             $goal = Goal::create([
+//                 'user_id' => $this->user->id,
+//                 'title' => 'Learn Testing',
+//                 'deadline' => '2026-02-10', // Very close deadline
+//                 'session_duration_minutes' => 60,
+//                 'availability_rules' => [
+//                     ['day' => 'monday', 'start' => '09:00', 'end' => '10:00'], // Only 1 session
+//                 ],
+//                 'status' => Goal::STATUS_ACTIVE,
+//             ]);
+
+//             // Create 3 pending tasks - more than available slots
+//             for ($i = 1; $i <= 3; $i++) {
+//                 Task::create([
+//                     'goal_id' => $goal->id,
+//                     'title' => "Task $i",
+//                     'order' => $i,
+//                     'scheduled_at' => '2026-02-02 09:00:00',
+//                     'status' => Task::STATUS_SCHEDULED,
+//                 ]);
+//             }
+
+//             // Replan
+//             $result = $this->replanService->replan($goal);
+
+//             expect($result['success'])->toBeTrue();
+//             expect($result['warning'])->not->toBeNull();
+//             expect($result['warning'])->toContain('slots disponibles');
+//         });
+
+//         it('returns empty result when no pending tasks', function () {
+//             $goal = Goal::create([
+//                 'user_id' => $this->user->id,
+//                 'title' => 'Learn Testing',
+//                 'deadline' => '2026-03-01',
+//                 'session_duration_minutes' => 60,
+//                 'availability_rules' => [
+//                     ['day' => 'monday', 'start' => '09:00', 'end' => '12:00'],
+//                 ],
+//                 'status' => Goal::STATUS_ACTIVE,
+//             ]);
+
+//             // Create only completed tasks
+//             Task::create([
+//                 'goal_id' => $goal->id,
+//                 'title' => 'Completed Task',
+//                 'order' => 1,
+//                 'scheduled_at' => '2026-02-02 09:00:00',
+//                 'status' => Task::STATUS_COMPLETED,
+//                 'completed_at' => now(),
+//             ]);
+
+//             // Replan
+//             $result = $this->replanService->replan($goal);
+
+//             expect($result['success'])->toBeTrue();
+//             expect($result['rescheduled_count'])->toBe(0);
+//             expect($result['message'])->toContain('No hay tareas pendientes');
+//         });
+
+//         it('does not assign locked slot to pending task', function () {
+//             $goal = Goal::create([
+//                 'user_id' => $this->user->id,
+//                 'title' => 'Learn Testing',
+//                 'deadline' => '2026-03-01',
+//                 'session_duration_minutes' => 60,
+//                 'availability_rules' => [
+//                     ['day' => 'monday', 'start' => '09:00', 'end' => '11:00'], // 2 sessions
+//                 ],
+//                 'status' => Goal::STATUS_ACTIVE,
+//             ]);
+
+//             // First Monday is 2026-02-09
+//             $lockedDate = '2026-02-09 09:00:00';
+
+//             // Create a locked task at 09:00
+//             Task::create([
+//                 'goal_id' => $goal->id,
+//                 'title' => 'Locked Task',
+//                 'order' => 1,
+//                 'scheduled_at' => $lockedDate,
+//                 'status' => Task::STATUS_SCHEDULED,
+//                 'is_locked' => true,
+//             ]);
+
+//             // Create a pending task
+//             $pendingTask = Task::create([
+//                 'goal_id' => $goal->id,
+//                 'title' => 'Pending Task',
+//                 'order' => 2,
+//                 'scheduled_at' => '2026-02-02 09:00:00',
+//                 'status' => Task::STATUS_SCHEDULED,
+//                 'is_locked' => false,
+//             ]);
+
+//             // Replan
+//             $this->replanService->replan($goal);
+
+//             // Pending task should NOT be assigned to the locked slot
+//             $newScheduledAt = $pendingTask->fresh()->scheduled_at;
+//             expect($newScheduledAt)->not->toBe($lockedDate);
+//         });
+
+//     });
+
+//     describe('recalculateCapacity', function () {
+
+//         it('updates goal total_sessions and total_hours', function () {
+//             $goal = Goal::create([
+//                 'user_id' => $this->user->id,
+//                 'title' => 'Learn Testing',
+//                 'deadline' => '2026-03-01',
+//                 'session_duration_minutes' => 60,
+//                 'availability_rules' => [
+//                     ['day' => 'monday', 'start' => '09:00', 'end' => '12:00'], // 3 sessions/week
+//                 ],
+//                 'status' => Goal::STATUS_ACTIVE,
+//                 'total_sessions' => 0,
+//                 'total_hours' => 0,
+//             ]);
+
+//             $capacity = $this->replanService->recalculateCapacity($goal);
+
+//             expect($capacity['total_sessions'])->toBeGreaterThan(0);
+//             expect($capacity['total_hours'])->toBeGreaterThan(0);
+
+//             $goal->refresh();
+//             expect($goal->total_sessions)->toBe($capacity['total_sessions']);
+//             expect((float) $goal->total_hours)->toBe($capacity['total_hours']);
+//         });
+
+//     });
+
+// });

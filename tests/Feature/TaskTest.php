@@ -12,7 +12,7 @@ describe('Tasks', function () {
     });
 
     describe('GET /api/goals/{goal}/tasks', function () {
-        
+
         it('lists tasks for a goal', function () {
             Task::factory()->count(3)->create(['goal_id' => $this->goal->id]);
 
@@ -43,7 +43,7 @@ describe('Tasks', function () {
     });
 
     describe('GET /api/tasks/{task}', function () {
-        
+
         it('shows task details', function () {
             $task = Task::factory()->create(['goal_id' => $this->goal->id]);
 
@@ -77,7 +77,7 @@ describe('Tasks', function () {
     });
 
     describe('PUT /api/tasks/{task}', function () {
-        
+
         it('updates task notes', function () {
             $task = Task::factory()->create(['goal_id' => $this->goal->id]);
 
@@ -96,7 +96,7 @@ describe('Tasks', function () {
     });
 
     describe('POST /api/tasks/{task}/complete', function () {
-        
+
         it('marks task as completed', function () {
             $task = Task::factory()->create(['goal_id' => $this->goal->id]);
 
@@ -137,7 +137,7 @@ describe('Tasks', function () {
     });
 
     describe('POST /api/tasks/{task}/skip', function () {
-        
+
         it('marks task as skipped', function () {
             $task = Task::factory()->create(['goal_id' => $this->goal->id]);
 
@@ -165,38 +165,39 @@ describe('Tasks', function () {
 
     });
 
-    describe('POST /api/tasks/{task}/lock', function () {
-        
-        it('locks task', function () {
-            $task = Task::factory()->create(['goal_id' => $this->goal->id]);
+    ## Funcionalidades de lock/unlock comentadas debido a replan inneficiente
+    // describe('POST /api/tasks/{task}/lock', function () {
 
-            $response = $this->actingAs($this->user)
-                ->postJson("/api/tasks/{$task->id}/lock");
+    //     it('locks task', function () {
+    //         $task = Task::factory()->create(['goal_id' => $this->goal->id]);
 
-            $response->assertStatus(200);
-            $this->assertDatabaseHas('tasks', [
-                'id' => $task->id,
-                'is_locked' => true,
-            ]);
-        });
+    //         $response = $this->actingAs($this->user)
+    //             ->postJson("/api/tasks/{$task->id}/lock");
 
-    });
+    //         $response->assertStatus(200);
+    //         $this->assertDatabaseHas('tasks', [
+    //             'id' => $task->id,
+    //             'is_locked' => true,
+    //         ]);
+    //     });
 
-    describe('POST /api/tasks/{task}/unlock', function () {
-        
-        it('unlocks task', function () {
-            $task = Task::factory()->locked()->create(['goal_id' => $this->goal->id]);
+    // });
 
-            $response = $this->actingAs($this->user)
-                ->postJson("/api/tasks/{$task->id}/unlock");
+    // describe('POST /api/tasks/{task}/unlock', function () {
 
-            $response->assertStatus(200);
-            $this->assertDatabaseHas('tasks', [
-                'id' => $task->id,
-                'is_locked' => false,
-            ]);
-        });
+    //     it('unlocks task', function () {
+    //         $task = Task::factory()->locked()->create(['goal_id' => $this->goal->id]);
 
-    });
+    //         $response = $this->actingAs($this->user)
+    //             ->postJson("/api/tasks/{$task->id}/unlock");
+
+    //         $response->assertStatus(200);
+    //         $this->assertDatabaseHas('tasks', [
+    //             'id' => $task->id,
+    //             'is_locked' => false,
+    //         ]);
+    //     });
+
+    // });
 
 });

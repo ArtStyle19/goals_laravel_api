@@ -1,0 +1,307 @@
+<?php
+
+// use App\Models\Goal;
+// use App\Models\Task;
+// use App\Models\User;
+// use Carbon\Carbon;
+// use Illuminate\Foundation\Testing\RefreshDatabase;
+
+// uses(RefreshDatabase::class);
+
+// describe('Replan Endpoints', function () {
+
+//     beforeEach(function () {
+//         Carbon::setTestNow(Carbon::parse('2026-02-05 08:00:00')); // Thursday
+//         $this->user = User::factory()->create();
+//     });
+
+//     afterEach(function () {
+//         Carbon::setTestNow();
+//     });
+
+//     describe('PUT /api/goals/{goal}/availability', function () {
+
+//         it('updates availability and replans tasks', function () {
+//             $goal = Goal::create([
+//                 'user_id' => $this->user->id,
+//                 'title' => 'Learn Testing',
+//                 'deadline' => '2026-03-01',
+//                 'session_duration_minutes' => 60,
+//                 'availability_rules' => [
+//                     ['day' => 'monday', 'start' => '09:00', 'end' => '12:00'],
+//                 ],
+//                 'status' => Goal::STATUS_ACTIVE,
+//                 'total_sessions' => 10,
+//                 'total_hours' => 10,
+//             ]);
+
+//             // Create tasks
+//             for ($i = 1; $i <= 3; $i++) {
+//                 Task::create([
+//                     'goal_id' => $goal->id,
+//                     'title' => "Task $i",
+//                     'order' => $i,
+//                     'scheduled_at' => '2026-02-02 09:00:00',
+//                     'status' => Task::STATUS_SCHEDULED,
+//                 ]);
+//             }
+
+//             $response = $this->actingAs($this->user)
+//                 ->putJson("/api/goals/{$goal->id}/availability", [
+//                     'availability_rules' => [
+//                         ['day' => 'tuesday', 'start' => '14:00', 'end' => '17:00'], // Changed to Tuesday
+//                     ],
+//                 ]);
+
+//             $response->assertOk()
+//                 ->assertJsonStructure([
+//                     'message',
+//                     'goal',
+//                     'capacity' => ['total_sessions', 'total_hours'],
+//                     'replan' => ['rescheduled_count', 'message'],
+//                 ]);
+
+//             expect($response->json('replan.rescheduled_count'))->toBe(3);
+
+//             // Verify goal availability was updated
+//             $goal->refresh();
+//             expect($goal->availability_rules[0]['day'])->toBe('tuesday');
+//         });
+
+//         it('rejects invalid availability blocks', function () {
+//             $goal = Goal::create([
+//                 'user_id' => $this->user->id,
+//                 'title' => 'Learn Testing',
+//                 'deadline' => '2026-03-01',
+//                 'session_duration_minutes' => 60,
+//                 'availability_rules' => [
+//                     ['day' => 'monday', 'start' => '09:00', 'end' => '12:00'],
+//                 ],
+//                 'status' => Goal::STATUS_ACTIVE,
+//             ]);
+
+//             $response = $this->actingAs($this->user)
+//                 ->putJson("/api/goals/{$goal->id}/availability", [
+//                     'availability_rules' => [
+//                         ['day' => 'monday', 'start' => '09:00', 'end' => '09:30'], // Not multiple of 60
+//                     ],
+//                 ]);
+
+//             $response->assertStatus(422);
+//         });
+
+//         it('requires authentication', function () {
+//             $goal = Goal::factory()->create();
+
+//             $response = $this->putJson("/api/goals/{$goal->id}/availability", [
+//                 'availability_rules' => [
+//                     ['day' => 'monday', 'start' => '09:00', 'end' => '12:00'],
+//                 ],
+//             ]);
+
+//             $response->assertUnauthorized();
+//         });
+
+//         it('returns 403 for other user goal', function () {
+//             $otherUser = User::factory()->create();
+//             $goal = Goal::create([
+//                 'user_id' => $otherUser->id,
+//                 'title' => 'Other User Goal',
+//                 'deadline' => '2026-03-01',
+//                 'session_duration_minutes' => 60,
+//                 'availability_rules' => [
+//                     ['day' => 'monday', 'start' => '09:00', 'end' => '12:00'],
+//                 ],
+//                 'status' => Goal::STATUS_ACTIVE,
+//             ]);
+
+//             $response = $this->actingAs($this->user)
+//                 ->putJson("/api/goals/{$goal->id}/availability", [
+//                     'availability_rules' => [
+//                         ['day' => 'tuesday', 'start' => '09:00', 'end' => '12:00'],
+//                     ],
+//                 ]);
+
+//             $response->assertForbidden();
+//         });
+
+//         it('rejects updating draft goal availability', function () {
+//             $goal = Goal::create([
+//                 'user_id' => $this->user->id,
+//                 'title' => 'Draft Goal',
+//                 'deadline' => '2026-03-01',
+//                 'session_duration_minutes' => 60,
+//                 'availability_rules' => [
+//                     ['day' => 'monday', 'start' => '09:00', 'end' => '12:00'],
+//                 ],
+//                 'status' => Goal::STATUS_DRAFT,
+//             ]);
+
+//             $response = $this->actingAs($this->user)
+//                 ->putJson("/api/goals/{$goal->id}/availability", [
+//                     'availability_rules' => [
+//                         ['day' => 'tuesday', 'start' => '09:00', 'end' => '12:00'],
+//                     ],
+//                 ]);
+
+//             $response->assertStatus(422)
+//                 ->assertJsonPath('message', 'Solo se puede cambiar la disponibilidad de objetivos activos');
+//         });
+
+//     });
+
+//     describe('PUT /api/goals/{goal}/deadline', function () {
+
+//         it('updates deadline and replans tasks', function () {
+//             $goal = Goal::create([
+//                 'user_id' => $this->user->id,
+//                 'title' => 'Learn Testing',
+//                 'deadline' => '2026-03-01',
+//                 'session_duration_minutes' => 60,
+//                 'availability_rules' => [
+//                     ['day' => 'monday', 'start' => '09:00', 'end' => '12:00'],
+//                 ],
+//                 'status' => Goal::STATUS_ACTIVE,
+//                 'total_sessions' => 10,
+//                 'total_hours' => 10,
+//             ]);
+
+//             // Create tasks
+//             for ($i = 1; $i <= 3; $i++) {
+//                 Task::create([
+//                     'goal_id' => $goal->id,
+//                     'title' => "Task $i",
+//                     'order' => $i,
+//                     'scheduled_at' => '2026-02-02 09:00:00',
+//                     'status' => Task::STATUS_SCHEDULED,
+//                 ]);
+//             }
+
+//             $response = $this->actingAs($this->user)
+//                 ->putJson("/api/goals/{$goal->id}/deadline", [
+//                     'deadline' => '2026-04-01', // Extended deadline
+//                 ]);
+
+//             $response->assertOk()
+//                 ->assertJsonStructure([
+//                     'message',
+//                     'goal',
+//                     'capacity' => ['total_sessions', 'total_hours'],
+//                     'replan' => ['rescheduled_count', 'message'],
+//                 ]);
+
+//             // Verify deadline was updated
+//             $goal->refresh();
+//             expect($goal->deadline->format('Y-m-d'))->toBe('2026-04-01');
+//         });
+
+//         it('returns warning when deadline too close for all tasks', function () {
+//             $goal = Goal::create([
+//                 'user_id' => $this->user->id,
+//                 'title' => 'Learn Testing',
+//                 'deadline' => '2026-04-01',
+//                 'session_duration_minutes' => 60,
+//                 'availability_rules' => [
+//                     ['day' => 'monday', 'start' => '09:00', 'end' => '10:00'], // Only 1 slot per week
+//                 ],
+//                 'status' => Goal::STATUS_ACTIVE,
+//                 'total_sessions' => 10,
+//                 'total_hours' => 10,
+//             ]);
+
+//             // Create 10 tasks - way more than available slots
+//             for ($i = 1; $i <= 10; $i++) {
+//                 Task::create([
+//                     'goal_id' => $goal->id,
+//                     'title' => "Task $i",
+//                     'order' => $i,
+//                     'scheduled_at' => '2026-02-02 09:00:00',
+//                     'status' => Task::STATUS_SCHEDULED,
+//                 ]);
+//             }
+
+//             $response = $this->actingAs($this->user)
+//                 ->putJson("/api/goals/{$goal->id}/deadline", [
+//                     'deadline' => '2026-02-15', // Very close deadline
+//                 ]);
+
+//             $response->assertOk();
+//             expect($response->json('warning'))->not->toBeNull();
+//             expect($response->json('warning'))->toContain('slots disponibles');
+//         });
+
+//         it('requires deadline in the future', function () {
+//             $goal = Goal::create([
+//                 'user_id' => $this->user->id,
+//                 'title' => 'Learn Testing',
+//                 'deadline' => '2026-03-01',
+//                 'session_duration_minutes' => 60,
+//                 'availability_rules' => [
+//                     ['day' => 'monday', 'start' => '09:00', 'end' => '12:00'],
+//                 ],
+//                 'status' => Goal::STATUS_ACTIVE,
+//             ]);
+
+//             $response = $this->actingAs($this->user)
+//                 ->putJson("/api/goals/{$goal->id}/deadline", [
+//                     'deadline' => '2026-02-01', // Past date
+//                 ]);
+
+//             $response->assertStatus(422);
+//         });
+
+//         it('requires authentication', function () {
+//             $goal = Goal::factory()->create();
+
+//             $response = $this->putJson("/api/goals/{$goal->id}/deadline", [
+//                 'deadline' => '2026-04-01',
+//             ]);
+
+//             $response->assertUnauthorized();
+//         });
+
+//         it('returns 403 for other user goal', function () {
+//             $otherUser = User::factory()->create();
+//             $goal = Goal::create([
+//                 'user_id' => $otherUser->id,
+//                 'title' => 'Other User Goal',
+//                 'deadline' => '2026-03-01',
+//                 'session_duration_minutes' => 60,
+//                 'availability_rules' => [
+//                     ['day' => 'monday', 'start' => '09:00', 'end' => '12:00'],
+//                 ],
+//                 'status' => Goal::STATUS_ACTIVE,
+//             ]);
+
+//             $response = $this->actingAs($this->user)
+//                 ->putJson("/api/goals/{$goal->id}/deadline", [
+//                     'deadline' => '2026-04-01',
+//                 ]);
+
+//             $response->assertForbidden();
+//         });
+
+//         it('rejects updating draft goal deadline', function () {
+//             $goal = Goal::create([
+//                 'user_id' => $this->user->id,
+//                 'title' => 'Draft Goal',
+//                 'deadline' => '2026-03-01',
+//                 'session_duration_minutes' => 60,
+//                 'availability_rules' => [
+//                     ['day' => 'monday', 'start' => '09:00', 'end' => '12:00'],
+//                 ],
+//                 'status' => Goal::STATUS_DRAFT,
+//             ]);
+
+//             $response = $this->actingAs($this->user)
+//                 ->putJson("/api/goals/{$goal->id}/deadline", [
+//                     'deadline' => '2026-04-01',
+//                 ]);
+
+//             $response->assertStatus(422)
+//                 ->assertJsonPath('message', 'Solo se puede cambiar el deadline de objetivos activos');
+//         });
+
+//     });
+
+// });

@@ -17,7 +17,8 @@ class GoalController extends Controller
     public function __construct(
         private SchedulingService $schedulingService,
         private PlannerService $plannerService,
-        private ReplanService $replanService
+        ## Servicio no implementado aún
+        // private ReplanService $replanService
     ) {}
 
     /**
@@ -184,7 +185,7 @@ class GoalController extends Controller
 
         // Generate slots
         $capacity = $this->schedulingService->calculateCapacity($goal);
-        
+
         if (count($validated['tasks']) > $capacity['total_sessions']) {
             return response()->json([
                 'message' => 'No hay suficientes slots disponibles',
@@ -247,8 +248,8 @@ class GoalController extends Controller
         $skippedTasks = $goal->tasks()->where('status', 'skipped')->count();
         $pendingTasks = $goal->tasks()->where('status', 'scheduled')->count();
 
-        $progressPercentage = $totalTasks > 0 
-            ? round(($completedTasks / $totalTasks) * 100, 1) 
+        $progressPercentage = $totalTasks > 0
+            ? round(($completedTasks / $totalTasks) * 100, 1)
             : 0;
 
         $hoursCompleted = round(($completedTasks * $goal->session_duration_minutes) / 60, 1);
@@ -366,69 +367,72 @@ class GoalController extends Controller
      */
     public function updateAvailability(Request $request, Goal $goal): JsonResponse
     {
-        // Ensure user owns this goal
-        if ($goal->user_id !== $request->user()->id) {
-            return response()->json(['message' => 'No autorizado'], 403);
-        }
+        // // Ensure user owns this goal
+        // if ($goal->user_id !== $request->user()->id) {
+        //     return response()->json(['message' => 'No autorizado'], 403);
+        // }
 
-        // Only allow updating active goals
-        if (!$goal->isActive()) {
-            return response()->json([
-                'message' => 'Solo se puede cambiar la disponibilidad de objetivos activos',
-            ], 422);
-        }
+        // // Only allow updating active goals
+        // if (!$goal->isActive()) {
+        //     return response()->json([
+        //         'message' => 'Solo se puede cambiar la disponibilidad de objetivos activos',
+        //     ], 422);
+        // }
 
-        $validated = $request->validate([
-            'availability_rules' => ['required', 'array', 'min:1'],
-            'availability_rules.*.day' => ['required', 'string', Rule::in(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])],
-            'availability_rules.*.start' => ['required', 'date_format:H:i'],
-            'availability_rules.*.end' => ['required', 'date_format:H:i', 'after:availability_rules.*.start'],
-        ]);
+        // $validated = $request->validate([
+        //     'availability_rules' => ['required', 'array', 'min:1'],
+        //     'availability_rules.*.day' => ['required', 'string', Rule::in(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])],
+        //     'availability_rules.*.start' => ['required', 'date_format:H:i'],
+        //     'availability_rules.*.end' => ['required', 'date_format:H:i', 'after:availability_rules.*.start'],
+        // ]);
 
-        // Validate that blocks are multiples of session duration
-        $blockValidation = $this->schedulingService->validateBlocks(
-            $validated['availability_rules'],
-            $goal->session_duration_minutes
-        );
+        // // Validate that blocks are multiples of session duration
+        // $blockValidation = $this->schedulingService->validateBlocks(
+        //     $validated['availability_rules'],
+        //     $goal->session_duration_minutes
+        // );
 
-        if (!$blockValidation['valid']) {
-            return response()->json([
-                'message' => 'Los bloques de disponibilidad no son válidos',
-                'errors' => ['availability_rules' => $blockValidation['errors']],
-            ], 422);
-        }
+        // if (!$blockValidation['valid']) {
+        //     return response()->json([
+        //         'message' => 'Los bloques de disponibilidad no son válidos',
+        //         'errors' => ['availability_rules' => $blockValidation['errors']],
+        //     ], 422);
+        // }
 
-        // Update availability rules
-        $goal->update([
-            'availability_rules' => $validated['availability_rules'],
-        ]);
+        // // Update availability rules
+        // $goal->update([
+        //     'availability_rules' => $validated['availability_rules'],
+        // ]);
 
-        // Recalculate capacity
-        $capacity = $this->replanService->recalculateCapacity($goal);
+        // // Recalculate capacity
+        // $capacity = $this->replanService->recalculateCapacity($goal);
 
-        // Replan pending tasks
-        $replanResult = $this->replanService->replan($goal);
+        // // Replan pending tasks
+        // $replanResult = $this->replanService->replan($goal);
 
-        $goal->load('tasks');
+        // $goal->load('tasks');
 
-        // Build response
-        $response = [
-            'message' => 'Disponibilidad actualizada',
-            'goal' => $goal,
-            'capacity' => $capacity,
-            'replan' => [
-                'rescheduled_count' => $replanResult['rescheduled_count'],
-                'message' => $replanResult['message'],
-                'warning' => $replanResult['warning'],
-            ],
-        ];
+        // // Build response
+        // $response = [
+        //     'message' => 'Disponibilidad actualizada',
+        //     'goal' => $goal,
+        //     'capacity' => $capacity,
+        //     'replan' => [
+        //         'rescheduled_count' => $replanResult['rescheduled_count'],
+        //         'message' => $replanResult['message'],
+        //         'warning' => $replanResult['warning'],
+        //     ],
+        // ];
 
-        // Include block validation warnings if any
-        if (!empty($blockValidation['warnings'])) {
-            $response['block_warnings'] = $blockValidation['warnings'];
-        }
+        // // Include block validation warnings if any
+        // if (!empty($blockValidation['warnings'])) {
+        //     $response['block_warnings'] = $blockValidation['warnings'];
+        // }
 
-        return response()->json($response);
+        // return response()->json($response);
+        return response()->json([
+            'message' => 'Funcionalidad de actualización de disponibilidad no implementada aún',
+        ], 501);
     }
 
     /**
@@ -436,58 +440,61 @@ class GoalController extends Controller
      */
     public function updateDeadline(Request $request, Goal $goal): JsonResponse
     {
-        // Ensure user owns this goal
-        if ($goal->user_id !== $request->user()->id) {
-            return response()->json(['message' => 'No autorizado'], 403);
-        }
+        // // Ensure user owns this goal
+        // if ($goal->user_id !== $request->user()->id) {
+        //     return response()->json(['message' => 'No autorizado'], 403);
+        // }
 
-        // Only allow updating active goals
-        if (!$goal->isActive()) {
-            return response()->json([
-                'message' => 'Solo se puede cambiar el deadline de objetivos activos',
-            ], 422);
-        }
+        // // Only allow updating active goals
+        // if (!$goal->isActive()) {
+        //     return response()->json([
+        //         'message' => 'Solo se puede cambiar el deadline de objetivos activos',
+        //     ], 422);
+        // }
 
-        $validated = $request->validate([
-            'deadline' => ['required', 'date', 'after:today'],
-        ]);
+        // $validated = $request->validate([
+        //     'deadline' => ['required', 'date', 'after:today'],
+        // ]);
 
-        // Update deadline
-        $goal->update([
-            'deadline' => $validated['deadline'],
-        ]);
+        // // Update deadline
+        // $goal->update([
+        //     'deadline' => $validated['deadline'],
+        // ]);
 
-        // Recalculate capacity
-        $capacity = $this->replanService->recalculateCapacity($goal);
+        // // Recalculate capacity
+        // $capacity = $this->replanService->recalculateCapacity($goal);
 
-        // Replan pending tasks
-        $replanResult = $this->replanService->replan($goal);
+        // // Replan pending tasks
+        // $replanResult = $this->replanService->replan($goal);
 
-        // Check if there are more tasks than available slots
-        $pendingTasksCount = $goal->tasks()
-            ->where('status', Task::STATUS_SCHEDULED)
-            ->count();
-        
-        $warning = null;
-        if ($capacity['total_sessions'] < $pendingTasksCount) {
-            $warning = sprintf(
-                'Solo hay %d slots disponibles para %d tareas pendientes',
-                $capacity['total_sessions'],
-                $pendingTasksCount
-            );
-        }
+        // // Check if there are more tasks than available slots
+        // $pendingTasksCount = $goal->tasks()
+        //     ->where('status', Task::STATUS_SCHEDULED)
+        //     ->count();
 
-        $goal->load('tasks');
+        // $warning = null;
+        // if ($capacity['total_sessions'] < $pendingTasksCount) {
+        //     $warning = sprintf(
+        //         'Solo hay %d slots disponibles para %d tareas pendientes',
+        //         $capacity['total_sessions'],
+        //         $pendingTasksCount
+        //     );
+        // }
 
+        // $goal->load('tasks');
+
+        // return response()->json([
+        //     'message' => 'Deadline actualizado',
+        //     'goal' => $goal,
+        //     'capacity' => $capacity,
+        //     'replan' => [
+        //         'rescheduled_count' => $replanResult['rescheduled_count'],
+        //         'message' => $replanResult['message'],
+        //     ],
+        //     'warning' => $warning ?? $replanResult['warning'],
+        // ]);
         return response()->json([
-            'message' => 'Deadline actualizado',
-            'goal' => $goal,
-            'capacity' => $capacity,
-            'replan' => [
-                'rescheduled_count' => $replanResult['rescheduled_count'],
-                'message' => $replanResult['message'],
-            ],
-            'warning' => $warning ?? $replanResult['warning'],
-        ]);
+            'message' => 'Funcionalidad de actualización de deadline no implementada aún',
+        ], 501);
     }
 }

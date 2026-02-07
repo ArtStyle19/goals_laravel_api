@@ -55,7 +55,7 @@ class AuthController extends Controller
         }
 
         $user = User::where('email', $validated['email'])->firstOrFail();
-        
+
         // Revoke previous tokens (optional: single session)
         // $user->tokens()->delete();
 
@@ -74,7 +74,7 @@ class AuthController extends Controller
     public function logout(Request $request): JsonResponse
     {
         $token = $request->user()->currentAccessToken();
-        
+
         // Only delete if it's a real token (not TransientToken from actingAs in tests)
         if (method_exists($token, 'delete')) {
             $token->delete();

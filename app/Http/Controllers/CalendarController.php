@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Traits\ResolvesTimezone;
 use App\Models\Task;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -9,6 +10,8 @@ use Carbon\Carbon;
 
 class CalendarController extends Controller
 {
+    use ResolvesTimezone;
+
     /**
      * Get calendar view with tasks in a date range.
      */
@@ -55,16 +58,24 @@ class CalendarController extends Controller
 
     /**
      * Get today's tasks.
+     *
+     * Uses X-Timezone header to determine what "today" means for the user.
+     * Converts the user's local day boundaries to UTC for querying.
      */
     public function today(Request $request): JsonResponse
     {
-        $today = Carbon::today();
+        $timezone = $this->resolveTimezone($request);
+
+        // "Today" in the user's timezone, converted to UTC boundaries
+        $todayStart = Carbon::today($timezone)->utc();
+        $todayEnd = Carbon::tomorrow($timezone)->utc();
 
         $tasks = Task::query()
             ->whereHas('goal', function ($query) use ($request) {
                 $query->where('user_id', $request->user()->id);
             })
-            ->whereDate('scheduled_at', $today)
+            ->where('scheduled_at', '>=', $todayStart)
+            ->where('scheduled_at', '<', $todayEnd)
             ->with('goal:id,title,session_duration_minutes')
             ->orderBy('scheduled_at')
             ->get()
@@ -85,7 +96,7 @@ class CalendarController extends Controller
         $totalMinutes = $tasks->sum('duration_minutes');
 
         return response()->json([
-            'date' => $today->toDateString(),
+            'date' => Carbon::today($timezone)->toDateString(),
             'tasks' => $tasks,
             'total_tasks' => $tasks->count(),
             'total_minutes' => $totalMinutes,
@@ -95,10 +106,12 @@ class CalendarController extends Controller
 
     /**
      * Get next upcoming task.
+     *
+     * Since scheduled_at is stored in UTC, we compare against UTC now.
      */
     public function next(Request $request): JsonResponse
     {
-        $now = Carbon::now();
+        $now = Carbon::now('UTC');
 
         $task = Task::query()
             ->whereHas('goal', function ($query) use ($request) {

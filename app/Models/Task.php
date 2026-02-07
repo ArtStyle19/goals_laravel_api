@@ -44,6 +44,17 @@ class Task extends Model
     }
 
     /**
+     * The accessors to append to the model's array form.
+     *
+     * @var array<int, string>
+     */
+    protected $appends = [
+        'end_at',
+        'duration_minutes',
+    ];
+
+
+    /**
      * Valid statuses.
      */
     public const STATUS_SCHEDULED = 'scheduled';
@@ -57,6 +68,21 @@ class Task extends Model
     {
         return $this->belongsTo(Goal::class);
     }
+
+
+    /**
+     * Get the end time of the task (calculated from scheduled_at + duration).
+     * Returns ISO8601 string for API responses.
+     */
+    // public function getEndAtAttribute(): string
+    // {
+    //     return $this->scheduled_at
+    //         ->copy()
+    //         ->addMinutes($this->goal->session_duration_minutes)
+    //         ->toIso8601String();
+    // }
+
+
 
     /**
      * Get the duration in minutes (from parent goal).

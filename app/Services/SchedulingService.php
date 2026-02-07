@@ -8,9 +8,9 @@ use Carbon\CarbonPeriod;
 
 /**
  * SchedulingService - Servicio de programación de sesiones
- * 
+ *
  * Responsabilidad única: Calcular capacidad y generar slots temporales.
- * 
+ *
  * IMPORTANTE - Limitaciones de diseño:
  * - Los bloques de disponibilidad NO pueden cruzar medianoche (ej: 22:00-02:00)
  * - Si necesitas sesiones nocturnas, usa bloques separados (ej: 22:00-23:59)
@@ -36,13 +36,14 @@ class SchedulingService
      * Returns total sessions, total hours, and available slots.
      *
      * @param Goal $goal
-     * @param Carbon|null $fromDate Starting date (default: today)
+     * @param Carbon|null $fromDate Starting date (default: today in user's timezone)
+     * @param string $timezone IANA timezone of the user (e.g. "America/Mexico_City")
      * @return array{total_sessions: int, total_hours: float, slots: array}
      */
-    public function calculateCapacity(Goal $goal, ?Carbon $fromDate = null): array
+    public function calculateCapacity(Goal $goal, ?Carbon $fromDate = null, string $timezone = 'UTC'): array
     {
-        $slots = $this->generateSlots($goal, $fromDate);
-        
+        $slots = $this->generateSlots($goal, $fromDate, $timezone);
+
         $totalSessions = count($slots);
         $totalHours = round(($totalSessions * $goal->session_duration_minutes) / 60, 1);
 
@@ -57,18 +58,22 @@ class SchedulingService
      * Generate all available slots from a starting date until the deadline.
      * Each slot represents one session.
      *
+     * Availability rules are interpreted in the user's local timezone.
+     * Generated slot datetimes are returned in UTC for consistent storage.
+     *
      * @param Goal $goal
-     * @param Carbon|null $fromDate Starting date (default: today)
-     * @return array Array of slots with date, start, and end times
+     * @param Carbon|null $fromDate Starting date (default: today in user's timezone)
+     * @param string $timezone IANA timezone of the user (e.g. "America/Mexico_City")
+     * @return array Array of slots with date, start, end times, and UTC datetime
      */
-    public function generateSlots(Goal $goal, ?Carbon $fromDate = null): array
+    public function generateSlots(Goal $goal, ?Carbon $fromDate = null, string $timezone = 'UTC'): array
     {
         $slots = [];
-        
-        // Start from today or the given date
-        $startDate = $fromDate ?? Carbon::today();
+
+        // Start from today in the user's timezone, or the given date
+        $startDate = $fromDate ?? Carbon::today($timezone);
         $endDate = Carbon::parse($goal->deadline);
-        
+
         // If deadline is in the past, return empty
         if ($endDate->lt($startDate)) {
             return [];
@@ -79,10 +84,10 @@ class SchedulingService
 
         // Iterate through each day from start to deadline
         $period = CarbonPeriod::create($startDate, $endDate);
-        
+
         foreach ($period as $date) {
             $dayName = strtolower($date->format('l')); // monday, tuesday, etc.
-            
+
             // Skip days without availability
             if (!isset($rulesByDay[$dayName])) {
                 continue;
@@ -94,15 +99,16 @@ class SchedulingService
                     $date,
                     $rule['start'],
                     $rule['end'],
-                    $goal->session_duration_minutes
+                    $goal->session_duration_minutes,
+                    $timezone
                 );
-                
+
                 $slots = array_merge($slots, $blockSlots);
             }
         }
 
-        // Filter out slots that are in the past (for today)
-        $now = Carbon::now();
+        // Filter out slots that are in the past (compare in UTC since datetimes are UTC)
+        $now = Carbon::now('UTC');
         $slots = array_filter($slots, function ($slot) use ($now) {
             return Carbon::parse($slot['datetime'])->gt($now);
         });
@@ -123,10 +129,10 @@ class SchedulingService
     {
         // Sort tasks by order
         usort($tasks, fn($a, $b) => ($a['order'] ?? 0) <=> ($b['order'] ?? 0));
-        
+
         $result = [];
         $slotIndex = 0;
-        
+
         foreach ($tasks as $task) {
             if ($slotIndex < count($slots)) {
                 $task['scheduled_at'] = $slots[$slotIndex]['datetime'];
@@ -135,7 +141,7 @@ class SchedulingService
                 // No more slots available
                 $task['scheduled_at'] = null;
             }
-            
+
             $result[] = $task;
         }
 
@@ -201,11 +207,11 @@ class SchedulingService
             if (count($dayBlocks) > 1) {
                 // Sort by start time
                 usort($dayBlocks, fn($a, $b) => strcmp($a['start'], $b['start']));
-                
+
                 for ($i = 0; $i < count($dayBlocks) - 1; $i++) {
                     $currentEnd = $dayBlocks[$i]['end'];
                     $nextStart = $dayBlocks[$i + 1]['start'];
-                    
+
                     if ($currentEnd > $nextStart) {
                         $warnings[] = "Los bloques en {$day} ({$dayBlocks[$i]['start']}-{$currentEnd} y {$nextStart}-{$dayBlocks[$i + 1]['end']}) se solapan. Esto puede causar duplicación de slots.";
                     }
@@ -229,7 +235,7 @@ class SchedulingService
     private function indexRulesByDay(array $rules): array
     {
         $indexed = [];
-        
+
         foreach ($rules as $rule) {
             $day = strtolower($rule['day']);
             if (!isset($indexed[$day])) {
@@ -249,35 +255,43 @@ class SchedulingService
     /**
      * Generate slots from a time block.
      *
+     * Creates slots in the user's local timezone, then converts to UTC for storage.
+     *
      * @param Carbon $date The date
-     * @param string $startTime Start time (HH:MM)
-     * @param string $endTime End time (HH:MM)
+     * @param string $startTime Start time (HH:MM) in user's local timezone
+     * @param string $endTime End time (HH:MM) in user's local timezone
      * @param int $sessionDuration Duration per session in minutes
-     * @return array Array of slots
+     * @param string $timezone IANA timezone of the user
+     * @return array Array of slots with UTC datetimes
      */
     private function generateSlotsFromBlock(
         Carbon $date,
         string $startTime,
         string $endTime,
-        int $sessionDuration
+        int $sessionDuration,
+        string $timezone = 'UTC'
     ): array {
         $slots = [];
-        
-        $blockStart = Carbon::parse($date->format('Y-m-d') . ' ' . $startTime);
-        $blockEnd = Carbon::parse($date->format('Y-m-d') . ' ' . $endTime);
-        
+
+        // Create times in user's local timezone
+        $blockStart = Carbon::parse($date->format('Y-m-d') . ' ' . $startTime, $timezone);
+        $blockEnd = Carbon::parse($date->format('Y-m-d') . ' ' . $endTime, $timezone);
+
         $blockMinutes = abs($blockEnd->diffInMinutes($blockStart));
         $sessionsInBlock = intdiv($blockMinutes, $sessionDuration);
-        
+
         for ($i = 0; $i < $sessionsInBlock; $i++) {
             $slotStart = $blockStart->copy()->addMinutes($i * $sessionDuration);
             $slotEnd = $slotStart->copy()->addMinutes($sessionDuration);
-            
+
+            // Convert to UTC for storage
+            $slotStartUtc = $slotStart->copy()->utc();
+
             $slots[] = [
                 'date' => $date->format('Y-m-d'),
                 'start' => $slotStart->format('H:i'),
                 'end' => $slotEnd->format('H:i'),
-                'datetime' => $slotStart->toDateTimeString(),
+                'datetime' => $slotStartUtc->toDateTimeString(),
             ];
         }
 

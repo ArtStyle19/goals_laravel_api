@@ -16,9 +16,10 @@ class PlannerService
      * Generate tasks for a goal using LLM and assign dates.
      *
      * @param Goal $goal The goal to generate tasks for
+     * @param string $timezone IANA timezone of the user (e.g. "America/Mexico_City")
      * @return array Result with 'success', 'tasks', 'error', 'warning'
      */
-    public function generatePlan(Goal $goal): array
+    public function generatePlan(Goal $goal, string $timezone = 'UTC'): array
     {
         // Check if LLM is configured
         if (!$this->llm->isConfigured()) {
@@ -31,7 +32,7 @@ class PlannerService
         }
 
         // 1. Calculate capacity
-        $capacity = $this->scheduling->calculateCapacity($goal);
+        $capacity = $this->scheduling->calculateCapacity($goal, null, $timezone);
 
         if ($capacity['total_sessions'] === 0) {
             return [
@@ -145,7 +146,7 @@ PROMPT;
     {
         $currentDate = Carbon::now()->format('Y-m-d');
         $daysUntilDeadline = Carbon::now()->diffInDays($goal->deadline, false);
-        
+
         $description = $goal->description ? "\nDESCRIPCIÓN ADICIONAL: {$goal->description}" : '';
 
         return <<<PROMPT

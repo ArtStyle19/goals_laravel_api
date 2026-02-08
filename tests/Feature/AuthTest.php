@@ -5,7 +5,7 @@ use App\Models\User;
 describe('Authentication', function () {
 
     describe('POST /api/register', function () {
-        
+
         it('registers a new user', function () {
             $response = $this->postJson('/api/register', [
                 'name' => 'Test User',
@@ -67,7 +67,7 @@ describe('Authentication', function () {
     });
 
     describe('POST /api/login', function () {
-        
+
         it('logs in with valid credentials', function () {
             $user = User::factory()->create([
                 'password' => bcrypt('password123'),
@@ -103,7 +103,7 @@ describe('Authentication', function () {
     });
 
     describe('POST /api/logout', function () {
-        
+
         it('logs out authenticated user', function () {
             $user = User::factory()->create();
 
@@ -123,7 +123,7 @@ describe('Authentication', function () {
     });
 
     describe('GET /api/me', function () {
-        
+
         it('returns authenticated user', function () {
             $user = User::factory()->create();
 

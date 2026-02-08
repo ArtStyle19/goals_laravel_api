@@ -146,7 +146,7 @@ describe('Edge Case Scheduling', function () {
             // Should succeed but with warning about overlapping blocks
             $response->assertStatus(201)
                 ->assertJsonStructure(['warnings']);
-            
+
             $warnings = $response->json('warnings');
             expect($warnings)->not->toBeEmpty();
         });

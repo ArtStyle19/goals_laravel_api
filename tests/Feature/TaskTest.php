@@ -11,33 +11,36 @@ describe('Tasks', function () {
         $this->goal = Goal::factory()->active()->create(['user_id' => $this->user->id]);
     });
 
-    describe('GET /api/goals/{goal}/tasks', function () {
+    describe('GET /api/goals/{goal}', function () {
 
         it('lists tasks for a goal', function () {
             Task::factory()->count(3)->create(['goal_id' => $this->goal->id]);
 
             $response = $this->actingAs($this->user)
-                ->getJson("/api/goals/{$this->goal->id}/tasks");
+                ->getJson("/api/goals/{$this->goal->id}");
 
             $response->assertStatus(200)
-                ->assertJsonCount(3, 'tasks');
+                ->assertJsonCount(3, 'goal.tasks');
         });
 
         it('returns tasks ordered by scheduled_at', function () {
             Task::factory()->create([
                 'goal_id' => $this->goal->id,
                 'scheduled_at' => now()->addDays(2),
+                'order' => 2,
             ]);
             Task::factory()->create([
                 'goal_id' => $this->goal->id,
                 'scheduled_at' => now()->addDay(),
+                'order' => 1,
             ]);
 
             $response = $this->actingAs($this->user)
-                ->getJson("/api/goals/{$this->goal->id}/tasks");
+                ->getJson("/api/goals/{$this->goal->id}");
 
-            $tasks = $response->json('tasks');
-            expect($tasks[0]['scheduled_at'] < $tasks[1]['scheduled_at'])->toBeTrue();
+            $tasks = $response->json('goal.tasks');
+            expect($tasks[0]['order'])->toBe(1);
+            expect($tasks[1]['order'])->toBe(2);
         });
 
     });
@@ -165,9 +168,9 @@ describe('Tasks', function () {
 
     });
 
-    ## Funcionalidades de lock/unlock comentadas debido a replan inneficiente
+    // NOTE: lock/unlock tests disabled - these features depend on replan which is disabled for now
     // describe('POST /api/tasks/{task}/lock', function () {
-
+    //
     //     it('locks task', function () {
     //         $task = Task::factory()->create(['goal_id' => $this->goal->id]);
 
@@ -184,7 +187,7 @@ describe('Tasks', function () {
     // });
 
     // describe('POST /api/tasks/{task}/unlock', function () {
-
+    //
     //     it('unlocks task', function () {
     //         $task = Task::factory()->locked()->create(['goal_id' => $this->goal->id]);
 

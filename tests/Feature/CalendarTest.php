@@ -12,10 +12,10 @@ describe('Calendar', function () {
     });
 
     describe('GET /api/calendar', function () {
-        
+
         it('returns tasks for date range', function () {
             $goal = Goal::factory()->active()->create(['user_id' => $this->user->id]);
-            
+
             Task::factory()->create([
                 'goal_id' => $goal->id,
                 'scheduled_at' => now()->setTime(10, 0),
@@ -48,7 +48,7 @@ describe('Calendar', function () {
                 'user_id' => $this->user->id,
                 'title' => 'Mi Meta',
             ]);
-            
+
             Task::factory()->create([
                 'goal_id' => $goal->id,
                 'scheduled_at' => now()->setTime(10, 0),
@@ -68,7 +68,7 @@ describe('Calendar', function () {
         it('only returns own tasks', function () {
             $otherUser = User::factory()->create();
             $otherGoal = Goal::factory()->active()->create(['user_id' => $otherUser->id]);
-            
+
             Task::factory()->create([
                 'goal_id' => $otherGoal->id,
                 'scheduled_at' => now()->setTime(10, 0),
@@ -86,10 +86,10 @@ describe('Calendar', function () {
     });
 
     describe('GET /api/today', function () {
-        
+
         it('returns tasks for today', function () {
             $goal = Goal::factory()->active()->create(['user_id' => $this->user->id]);
-            
+
             Task::factory()->create([
                 'goal_id' => $goal->id,
                 'scheduled_at' => now()->setTime(10, 0),
@@ -123,10 +123,10 @@ describe('Calendar', function () {
     });
 
     describe('GET /api/next', function () {
-        
+
         it('returns next upcoming task', function () {
             $goal = Goal::factory()->active()->create(['user_id' => $this->user->id]);
-            
+
             Task::factory()->create([
                 'goal_id' => $goal->id,
                 'scheduled_at' => now()->addHour(),

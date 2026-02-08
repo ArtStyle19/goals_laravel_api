@@ -35,11 +35,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/goals/{goal}/generate', [GoalController::class, 'generate']);
     Route::get('/goals/{goal}/stats', [GoalController::class, 'stats']);
     Route::post('/goals/{goal}/complete', [GoalController::class, 'complete']);
-    ## Funcionalidades no implementadas aún
-    Route::put('/goals/{goal}/availability', [GoalController::class, 'updateAvailability']);
-    Route::put('/goals/{goal}/deadline', [GoalController::class, 'updateDeadline']);
 
-    // Tasks (nested under goals)
+    // Route::put('/goals/{goal}/availability', [GoalController::class, 'updateAvailability']);
+    // Route::put('/goals/{goal}/deadline', [GoalController::class, 'updateDeadline']);
+
+    // Tasks (nested under goals) Not usable yet
     Route::get('/goals/{goal}/tasks', [TaskController::class, 'index']);
 
     // Tasks (direct access)
@@ -47,10 +47,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/tasks/{task}', [TaskController::class, 'update']);
     Route::post('/tasks/{task}/complete', [TaskController::class, 'complete']);
     Route::post('/tasks/{task}/skip', [TaskController::class, 'skip']);
-
-    ## Old replan functionalities
-    // Route::post('/tasks/{task}/lock', [TaskController::class, 'lock']);
-    // Route::post('/tasks/{task}/unlock', [TaskController::class, 'unlock']);
 
     // Calendar Views
     Route::get('/calendar', [CalendarController::class, 'index']);

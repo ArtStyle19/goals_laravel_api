@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use OpenApi\Attributes as OA;
 
 class GoalController extends Controller
 {
@@ -26,6 +27,30 @@ class GoalController extends Controller
     /**
      * Display a listing of the user's goals.
      */
+    #[OA\Get(
+        path: '/goals',
+        operationId: 'listGoals',
+        summary: 'Listar objetivos del usuario',
+        description: 'Devuelve todos los objetivos del usuario autenticado con conteos de tareas totales y completadas.',
+        security: [['sanctum' => []]],
+        tags: ['Goals'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Lista de objetivos',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(
+                            property: 'goals',
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/GoalWithCounts')
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'No autenticado', content: new OA\JsonContent(ref: '#/components/schemas/UnauthorizedError')),
+        ]
+    )]
     public function index(Request $request): JsonResponse
     {
         $goals = $request->user()
@@ -45,6 +70,70 @@ class GoalController extends Controller
     /**
      * Store a newly created goal.
      */
+    #[OA\Post(
+        path: '/goals',
+        operationId: 'createGoal',
+        summary: 'Crear nuevo objetivo',
+        description: 'Crea un objetivo en estado draft con reglas de disponibilidad semanal. Calcula automáticamente la capacidad (sesiones disponibles hasta el deadline).',
+        security: [['sanctum' => []]],
+        tags: ['Goals'],
+        parameters: [
+            new OA\Parameter(ref: '#/components/parameters/X-Timezone'),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['title', 'deadline', 'session_duration_minutes', 'availability_rules'],
+                properties: [
+                    new OA\Property(property: 'title', type: 'string', maxLength: 255, example: 'Aprender Laravel'),
+                    new OA\Property(property: 'description', type: 'string', nullable: true, example: 'Curso completo de Laravel desde cero hasta avanzado'),
+                    new OA\Property(property: 'deadline', type: 'string', format: 'date', example: '2026-06-01', description: 'Debe ser posterior a hoy'),
+                    new OA\Property(
+                        property: 'session_duration_minutes',
+                        type: 'integer',
+                        enum: [30, 45, 60, 90, 120],
+                        example: 60,
+                        description: 'Duración de cada sesión de estudio'
+                    ),
+                    new OA\Property(
+                        property: 'availability_rules',
+                        type: 'array',
+                        items: new OA\Items(ref: '#/components/schemas/AvailabilityRule'),
+                        minItems: 1,
+                        description: 'Bloques de disponibilidad semanal. Cada bloque debe ser múltiplo de session_duration_minutes.'
+                    ),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Objetivo creado exitosamente',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Objetivo creado exitosamente'),
+                        new OA\Property(property: 'goal', ref: '#/components/schemas/Goal'),
+                        new OA\Property(
+                            property: 'capacity',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'total_sessions', type: 'integer', example: 48),
+                                new OA\Property(property: 'total_hours', type: 'number', format: 'float', example: 48.0),
+                            ]
+                        ),
+                        new OA\Property(
+                            property: 'warnings',
+                            type: 'array',
+                            items: new OA\Items(type: 'string'),
+                            description: 'Advertencias sobre bloques de disponibilidad (opcional)'
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'No autenticado', content: new OA\JsonContent(ref: '#/components/schemas/UnauthorizedError')),
+            new OA\Response(response: 422, description: 'Error de validación', content: new OA\JsonContent(ref: '#/components/schemas/ValidationError')),
+        ]
+    )]
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -107,6 +196,31 @@ class GoalController extends Controller
     /**
      * Display the specified goal.
      */
+    #[OA\Get(
+        path: '/goals/{goalId}',
+        operationId: 'showGoal',
+        summary: 'Ver detalle de un objetivo',
+        description: 'Devuelve un objetivo con todas sus tareas ordenadas por orden.',
+        security: [['sanctum' => []]],
+        tags: ['Goals'],
+        parameters: [
+            new OA\Parameter(name: 'goalId', in: 'path', required: true, description: 'ID del objetivo', schema: new OA\Schema(type: 'integer', example: 1)),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Detalle del objetivo con tareas',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'goal', ref: '#/components/schemas/GoalWithTasks'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'No autenticado', content: new OA\JsonContent(ref: '#/components/schemas/UnauthorizedError')),
+            new OA\Response(response: 403, description: 'No autorizado', content: new OA\JsonContent(ref: '#/components/schemas/ForbiddenError')),
+            new OA\Response(response: 404, description: 'Objetivo no encontrado', content: new OA\JsonContent(ref: '#/components/schemas/NotFoundError')),
+        ]
+    )]
     public function show(Request $request, Goal $goal): JsonResponse
     {
         // Ensure user owns this goal
@@ -126,6 +240,42 @@ class GoalController extends Controller
     /**
      * Update the specified goal.
      */
+    #[OA\Put(
+        path: '/goals/{goalId}',
+        operationId: 'updateGoal',
+        summary: 'Actualizar objetivo',
+        description: 'Actualiza el título y/o descripción de un objetivo.',
+        security: [['sanctum' => []]],
+        tags: ['Goals'],
+        parameters: [
+            new OA\Parameter(name: 'goalId', in: 'path', required: true, description: 'ID del objetivo', schema: new OA\Schema(type: 'integer', example: 1)),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'title', type: 'string', maxLength: 255, example: 'Aprender Laravel Avanzado'),
+                    new OA\Property(property: 'description', type: 'string', nullable: true, example: 'Enfoque en APIs REST y testing'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Objetivo actualizado',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Objetivo actualizado'),
+                        new OA\Property(property: 'goal', ref: '#/components/schemas/Goal'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'No autenticado', content: new OA\JsonContent(ref: '#/components/schemas/UnauthorizedError')),
+            new OA\Response(response: 403, description: 'No autorizado', content: new OA\JsonContent(ref: '#/components/schemas/ForbiddenError')),
+            new OA\Response(response: 404, description: 'Objetivo no encontrado', content: new OA\JsonContent(ref: '#/components/schemas/NotFoundError')),
+            new OA\Response(response: 422, description: 'Error de validación', content: new OA\JsonContent(ref: '#/components/schemas/ValidationError')),
+        ]
+    )]
     public function update(Request $request, Goal $goal): JsonResponse
     {
         // Ensure user owns this goal
@@ -149,6 +299,31 @@ class GoalController extends Controller
     /**
      * Remove the specified goal.
      */
+    #[OA\Delete(
+        path: '/goals/{goalId}',
+        operationId: 'deleteGoal',
+        summary: 'Eliminar objetivo',
+        description: 'Elimina un objetivo y todas sus tareas asociadas (cascade).',
+        security: [['sanctum' => []]],
+        tags: ['Goals'],
+        parameters: [
+            new OA\Parameter(name: 'goalId', in: 'path', required: true, description: 'ID del objetivo', schema: new OA\Schema(type: 'integer', example: 1)),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Objetivo eliminado',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Objetivo eliminado'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'No autenticado', content: new OA\JsonContent(ref: '#/components/schemas/UnauthorizedError')),
+            new OA\Response(response: 403, description: 'No autorizado', content: new OA\JsonContent(ref: '#/components/schemas/ForbiddenError')),
+            new OA\Response(response: 404, description: 'Objetivo no encontrado', content: new OA\JsonContent(ref: '#/components/schemas/NotFoundError')),
+        ]
+    )]
     public function destroy(Request $request, Goal $goal): JsonResponse
     {
         // Ensure user owns this goal
@@ -166,6 +341,72 @@ class GoalController extends Controller
     /**
      * Add tasks manually to a goal.
      */
+    #[OA\Post(
+        path: '/goals/{goalId}/tasks',
+        operationId: 'addTasksToGoal',
+        summary: 'Agregar tareas manualmente',
+        description: 'Agrega tareas manualmente a un objetivo en estado draft. Las tareas se programan automáticamente en los slots de disponibilidad. El objetivo pasa a estado active.',
+        security: [['sanctum' => []]],
+        tags: ['Goals'],
+        parameters: [
+            new OA\Parameter(name: 'goalId', in: 'path', required: true, description: 'ID del objetivo (debe estar en draft)', schema: new OA\Schema(type: 'integer', example: 1)),
+            new OA\Parameter(ref: '#/components/parameters/X-Timezone'),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['tasks'],
+                properties: [
+                    new OA\Property(
+                        property: 'tasks',
+                        type: 'array',
+                        minItems: 1,
+                        items: new OA\Items(
+                            required: ['title'],
+                            properties: [
+                                new OA\Property(property: 'title', type: 'string', maxLength: 255, example: 'Sesión 1: Introducción'),
+                                new OA\Property(property: 'description', type: 'string', nullable: true, example: 'Conceptos básicos del tema'),
+                            ],
+                            type: 'object'
+                        )
+                    ),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Tareas agregadas exitosamente',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Tareas agregadas exitosamente'),
+                        new OA\Property(property: 'goal', ref: '#/components/schemas/GoalWithTasks'),
+                        new OA\Property(
+                            property: 'stats',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'total_tasks', type: 'integer', example: 10),
+                                new OA\Property(property: 'total_hours', type: 'number', format: 'float', example: 10.0),
+                            ]
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'No autenticado', content: new OA\JsonContent(ref: '#/components/schemas/UnauthorizedError')),
+            new OA\Response(response: 403, description: 'No autorizado', content: new OA\JsonContent(ref: '#/components/schemas/ForbiddenError')),
+            new OA\Response(
+                response: 422,
+                description: 'Error de validación o slots insuficientes',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'No hay suficientes slots disponibles'),
+                        new OA\Property(property: 'available_slots', type: 'integer', example: 5),
+                        new OA\Property(property: 'requested_tasks', type: 'integer', example: 10),
+                    ]
+                )
+            ),
+        ]
+    )]
     public function addTasks(Request $request, Goal $goal): JsonResponse
     {
         // Ensure user owns this goal
@@ -240,6 +481,32 @@ class GoalController extends Controller
     /**
      * Get goal statistics.
      */
+    #[OA\Get(
+        path: '/goals/{goalId}/stats',
+        operationId: 'goalStats',
+        summary: 'Estadísticas del objetivo',
+        description: 'Devuelve métricas de progreso: tareas completadas/pendientes, horas, porcentaje de avance y si va en tiempo.',
+        security: [['sanctum' => []]],
+        tags: ['Goals'],
+        parameters: [
+            new OA\Parameter(name: 'goalId', in: 'path', required: true, description: 'ID del objetivo', schema: new OA\Schema(type: 'integer', example: 1)),
+            new OA\Parameter(ref: '#/components/parameters/X-Timezone'),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Estadísticas del objetivo',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'stats', ref: '#/components/schemas/GoalStats'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'No autenticado', content: new OA\JsonContent(ref: '#/components/schemas/UnauthorizedError')),
+            new OA\Response(response: 403, description: 'No autorizado', content: new OA\JsonContent(ref: '#/components/schemas/ForbiddenError')),
+            new OA\Response(response: 404, description: 'Objetivo no encontrado', content: new OA\JsonContent(ref: '#/components/schemas/NotFoundError')),
+        ]
+    )]
     public function stats(Request $request, Goal $goal): JsonResponse
     {
         // Ensure user owns this goal
@@ -285,6 +552,54 @@ class GoalController extends Controller
     /**
      * Generate tasks for a goal using LLM.
      */
+    #[OA\Post(
+        path: '/goals/{goalId}/generate',
+        operationId: 'generateGoalPlan',
+        summary: 'Generar plan con IA',
+        description: 'Genera un plan de tareas usando LLM (IA) para un objetivo en estado draft. Las tareas se crean y programan automáticamente. El objetivo pasa a estado active.',
+        security: [['sanctum' => []]],
+        tags: ['Goals'],
+        parameters: [
+            new OA\Parameter(name: 'goalId', in: 'path', required: true, description: 'ID del objetivo (debe estar en draft)', schema: new OA\Schema(type: 'integer', example: 1)),
+            new OA\Parameter(ref: '#/components/parameters/X-Timezone'),
+        ],
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Plan generado exitosamente',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string', example: 'Plan generado exitosamente'),
+                        new OA\Property(property: 'goal', ref: '#/components/schemas/GoalWithTasks'),
+                        new OA\Property(
+                            property: 'stats',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'total_tasks', type: 'integer', example: 15),
+                                new OA\Property(property: 'total_hours', type: 'number', format: 'float', example: 15.0),
+                            ]
+                        ),
+                        new OA\Property(property: 'warning', type: 'string', nullable: true, example: null, description: 'Advertencia del planificador (si aplica)'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'No autenticado', content: new OA\JsonContent(ref: '#/components/schemas/UnauthorizedError')),
+            new OA\Response(response: 403, description: 'No autorizado', content: new OA\JsonContent(ref: '#/components/schemas/ForbiddenError')),
+            new OA\Response(
+                response: 422,
+                description: 'Error al generar plan o objetivo no está en draft',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: false),
+                        new OA\Property(property: 'error', type: 'string', example: 'Solo se pueden generar tareas para objetivos en estado draft'),
+                        new OA\Property(property: 'suggestion', type: 'string', example: 'Intenta de nuevo o agrega tareas manualmente'),
+                        new OA\Property(property: 'manual_endpoint', type: 'string', example: '/api/goals/1/tasks'),
+                    ]
+                )
+            ),
+        ]
+    )]
     public function generate(Request $request, Goal $goal): JsonResponse
     {
         // Ensure user owns this goal
@@ -347,6 +662,41 @@ class GoalController extends Controller
     /**
      * Mark goal as completed.
      */
+    #[OA\Post(
+        path: '/goals/{goalId}/complete',
+        operationId: 'completeGoal',
+        summary: 'Completar objetivo',
+        description: 'Marca un objetivo como completado. No se puede completar un objetivo que ya está completado.',
+        security: [['sanctum' => []]],
+        tags: ['Goals'],
+        parameters: [
+            new OA\Parameter(name: 'goalId', in: 'path', required: true, description: 'ID del objetivo', schema: new OA\Schema(type: 'integer', example: 1)),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Objetivo completado',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Objetivo completado'),
+                        new OA\Property(property: 'goal', ref: '#/components/schemas/Goal'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'No autenticado', content: new OA\JsonContent(ref: '#/components/schemas/UnauthorizedError')),
+            new OA\Response(response: 403, description: 'No autorizado', content: new OA\JsonContent(ref: '#/components/schemas/ForbiddenError')),
+            new OA\Response(response: 404, description: 'Objetivo no encontrado', content: new OA\JsonContent(ref: '#/components/schemas/NotFoundError')),
+            new OA\Response(
+                response: 422,
+                description: 'Objetivo ya completado',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'El objetivo ya está completado'),
+                    ]
+                )
+            ),
+        ]
+    )]
     public function complete(Request $request, Goal $goal): JsonResponse
     {
         // Ensure user owns this goal

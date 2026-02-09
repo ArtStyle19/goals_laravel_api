@@ -6,12 +6,42 @@ use App\Models\Goal;
 use App\Models\Task;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use OpenApi\Attributes as OA;
 
 class TaskController extends Controller
 {
     /**
      * Display a listing of tasks for a goal.
      */
+    #[OA\Get(
+        path: '/goals/{goalId}/tasks',
+        operationId: 'listGoalTasks',
+        summary: 'Listar tareas de un objetivo',
+        description: 'Devuelve todas las tareas de un objetivo ordenadas por fecha programada, con información de duración.',
+        security: [['sanctum' => []]],
+        tags: ['Tasks'],
+        parameters: [
+            new OA\Parameter(name: 'goalId', in: 'path', required: true, description: 'ID del objetivo', schema: new OA\Schema(type: 'integer', example: 1)),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Lista de tareas',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(
+                            property: 'tasks',
+                            type: 'array',
+                            items: new OA\Items(ref: '#/components/schemas/TaskDetail')
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'No autenticado', content: new OA\JsonContent(ref: '#/components/schemas/UnauthorizedError')),
+            new OA\Response(response: 403, description: 'No autorizado', content: new OA\JsonContent(ref: '#/components/schemas/ForbiddenError')),
+            new OA\Response(response: 404, description: 'Objetivo no encontrado', content: new OA\JsonContent(ref: '#/components/schemas/NotFoundError')),
+        ]
+    )]
     public function index(Request $request, Goal $goal): JsonResponse
     {
         // Ensure user owns this goal
@@ -46,6 +76,31 @@ class TaskController extends Controller
     /**
      * Display the specified task.
      */
+    #[OA\Get(
+        path: '/tasks/{taskId}',
+        operationId: 'showTask',
+        summary: 'Ver detalle de una tarea',
+        description: 'Devuelve información detallada de una tarea incluyendo el título del objetivo padre.',
+        security: [['sanctum' => []]],
+        tags: ['Tasks'],
+        parameters: [
+            new OA\Parameter(name: 'taskId', in: 'path', required: true, description: 'ID de la tarea', schema: new OA\Schema(type: 'integer', example: 1)),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Detalle de la tarea',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'task', ref: '#/components/schemas/TaskDetail'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'No autenticado', content: new OA\JsonContent(ref: '#/components/schemas/UnauthorizedError')),
+            new OA\Response(response: 403, description: 'No autorizado', content: new OA\JsonContent(ref: '#/components/schemas/ForbiddenError')),
+            new OA\Response(response: 404, description: 'Tarea no encontrada', content: new OA\JsonContent(ref: '#/components/schemas/NotFoundError')),
+        ]
+    )]
     public function show(Request $request, Task $task): JsonResponse
     {
         // Ensure user owns this task's goal
@@ -75,6 +130,41 @@ class TaskController extends Controller
     /**
      * Update the specified task (only notes).
      */
+    #[OA\Put(
+        path: '/tasks/{taskId}',
+        operationId: 'updateTask',
+        summary: 'Actualizar notas de tarea',
+        description: 'Permite actualizar las notas personales de una tarea.',
+        security: [['sanctum' => []]],
+        tags: ['Tasks'],
+        parameters: [
+            new OA\Parameter(name: 'taskId', in: 'path', required: true, description: 'ID de la tarea', schema: new OA\Schema(type: 'integer', example: 1)),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'notes', type: 'string', nullable: true, example: 'Revisar el capítulo 3 antes de la sesión'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Tarea actualizada',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Tarea actualizada'),
+                        new OA\Property(property: 'task', ref: '#/components/schemas/Task'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'No autenticado', content: new OA\JsonContent(ref: '#/components/schemas/UnauthorizedError')),
+            new OA\Response(response: 403, description: 'No autorizado', content: new OA\JsonContent(ref: '#/components/schemas/ForbiddenError')),
+            new OA\Response(response: 404, description: 'Tarea no encontrada', content: new OA\JsonContent(ref: '#/components/schemas/NotFoundError')),
+            new OA\Response(response: 422, description: 'Error de validación', content: new OA\JsonContent(ref: '#/components/schemas/ValidationError')),
+        ]
+    )]
     public function update(Request $request, Task $task): JsonResponse
     {
         // Ensure user owns this task's goal
@@ -97,6 +187,49 @@ class TaskController extends Controller
     /**
      * Mark task as completed.
      */
+    #[OA\Post(
+        path: '/tasks/{taskId}/complete',
+        operationId: 'completeTask',
+        summary: 'Completar tarea',
+        description: 'Marca una tarea como completada. Opcionalmente se pueden agregar notas. No se puede completar una tarea ya completada.',
+        security: [['sanctum' => []]],
+        tags: ['Tasks'],
+        parameters: [
+            new OA\Parameter(name: 'taskId', in: 'path', required: true, description: 'ID de la tarea', schema: new OA\Schema(type: 'integer', example: 1)),
+        ],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'notes', type: 'string', nullable: true, example: 'Completado con éxito, tema bien comprendido'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Tarea completada',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Tarea completada'),
+                        new OA\Property(property: 'task', ref: '#/components/schemas/Task'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'No autenticado', content: new OA\JsonContent(ref: '#/components/schemas/UnauthorizedError')),
+            new OA\Response(response: 403, description: 'No autorizado', content: new OA\JsonContent(ref: '#/components/schemas/ForbiddenError')),
+            new OA\Response(response: 404, description: 'Tarea no encontrada', content: new OA\JsonContent(ref: '#/components/schemas/NotFoundError')),
+            new OA\Response(
+                response: 422,
+                description: 'Tarea ya completada',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'La tarea ya está completada'),
+                    ]
+                )
+            ),
+        ]
+    )]
     public function complete(Request $request, Task $task): JsonResponse
     {
         // Ensure user owns this task's goal
@@ -125,6 +258,49 @@ class TaskController extends Controller
     /**
      * Mark task as skipped.
      */
+    #[OA\Post(
+        path: '/tasks/{taskId}/skip',
+        operationId: 'skipTask',
+        summary: 'Saltar tarea',
+        description: 'Marca una tarea programada como saltada (skipped). Solo aplica a tareas en estado scheduled. Se puede incluir una razón.',
+        security: [['sanctum' => []]],
+        tags: ['Tasks'],
+        parameters: [
+            new OA\Parameter(name: 'taskId', in: 'path', required: true, description: 'ID de la tarea', schema: new OA\Schema(type: 'integer', example: 1)),
+        ],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'reason', type: 'string', nullable: true, example: 'No tuve tiempo hoy'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Tarea saltada',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Tarea saltada'),
+                        new OA\Property(property: 'task', ref: '#/components/schemas/Task'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'No autenticado', content: new OA\JsonContent(ref: '#/components/schemas/UnauthorizedError')),
+            new OA\Response(response: 403, description: 'No autorizado', content: new OA\JsonContent(ref: '#/components/schemas/ForbiddenError')),
+            new OA\Response(response: 404, description: 'Tarea no encontrada', content: new OA\JsonContent(ref: '#/components/schemas/NotFoundError')),
+            new OA\Response(
+                response: 422,
+                description: 'Solo se pueden saltar tareas programadas',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Solo se pueden saltar tareas programadas'),
+                    ]
+                )
+            ),
+        ]
+    )]
     public function skip(Request $request, Task $task): JsonResponse
     {
         // Ensure user owns this task's goal

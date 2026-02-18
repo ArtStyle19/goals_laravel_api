@@ -23,6 +23,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'fcm_token',
     ];
 
     /**
@@ -33,6 +34,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'fcm_token',
     ];
 
     /**
@@ -62,5 +64,15 @@ class User extends Authenticatable
     public function tasks(): HasMany
     {
         return $this->hasManyThrough(Task::class, Goal::class);
+    }
+
+    /**
+     * Route notifications for the FCM channel.
+     *
+     * @return string|null
+     */
+    public function routeNotificationForFcm(): ?string
+    {
+        return $this->fcm_token;
     }
 }

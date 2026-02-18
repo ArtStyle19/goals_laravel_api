@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\GoalController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\TaskController;
 use Illuminate\Support\Facades\Route;
 
@@ -52,5 +53,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/calendar', [CalendarController::class, 'index']);
     Route::get('/today', [CalendarController::class, 'today']);
     Route::get('/next', [CalendarController::class, 'next']);
-});
 
+    // FCM Notifications
+    Route::post('/user/fcm-token', [NotificationController::class, 'storeToken']);
+    Route::delete('/user/fcm-token', [NotificationController::class, 'removeToken']);
+    Route::post('/test-notification', [NotificationController::class, 'sendTest']);
+    Route::get('/notification-status', [NotificationController::class, 'status']);
+});

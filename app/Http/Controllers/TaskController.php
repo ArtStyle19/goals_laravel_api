@@ -4,12 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\Goal;
 use App\Models\Task;
+use App\Services\TaskNotificationScheduler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 
 class TaskController extends Controller
 {
+    public function __construct(
+        private TaskNotificationScheduler $notificationScheduler
+    ) {}
     /**
      * Display a listing of tasks for a goal.
      */
@@ -249,6 +253,9 @@ class TaskController extends Controller
 
         $task->markAsCompleted($validated['notes'] ?? null);
 
+        // Cancel any pending notifications for this task
+        $this->notificationScheduler->cancelTaskNotifications($task->id);
+
         return response()->json([
             'message' => 'Tarea completada',
             'task' => $task->fresh(),
@@ -319,6 +326,165 @@ class TaskController extends Controller
         ]);
 
         $task->markAsSkipped($validated['reason'] ?? null);
+
+        // Cancel any pending notifications for this task
+        $this->notificationScheduler->cancelTaskNotifications($task->id);
+
+        return response()->json([
+            'message' => 'Tarea saltada',
+            'task' => $task->fresh(),
+        ]);
+    }
+
+    /**
+     * Complete task from notification action.
+     *
+     * This endpoint is called when user taps "Completar" button
+     * in the push notification. It works the same as complete()
+     * but is optimized for notification actions.
+     */
+    #[OA\Post(
+        path: '/tasks/{taskId}/complete-from-notification',
+        operationId: 'completeTaskFromNotification',
+        summary: 'Completar tarea desde notificación',
+        description: 'Marca una tarea como completada desde una acción de notificación push. Funciona igual que complete() pero optimizado para notificaciones.',
+        security: [['sanctum' => []]],
+        tags: ['Tasks'],
+        parameters: [
+            new OA\Parameter(name: 'taskId', in: 'path', required: true, description: 'ID de la tarea', schema: new OA\Schema(type: 'integer', example: 1)),
+        ],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'notes', type: 'string', nullable: true, example: 'Completado desde notificación'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Tarea completada',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Tarea completada'),
+                        new OA\Property(property: 'task', ref: '#/components/schemas/Task'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'No autenticado', content: new OA\JsonContent(ref: '#/components/schemas/UnauthorizedError')),
+            new OA\Response(response: 403, description: 'No autorizado', content: new OA\JsonContent(ref: '#/components/schemas/ForbiddenError')),
+            new OA\Response(response: 404, description: 'Tarea no encontrada', content: new OA\JsonContent(ref: '#/components/schemas/NotFoundError')),
+            new OA\Response(
+                response: 422,
+                description: 'Tarea ya completada',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'La tarea ya está completada'),
+                    ]
+                )
+            ),
+        ]
+    )]
+    public function completeFromNotification(Request $request, Task $task): JsonResponse
+    {
+        // Ensure user owns this task's goal
+        if ($task->goal->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'No autorizado'], 403);
+        }
+
+        if ($task->isCompleted()) {
+            return response()->json([
+                'message' => 'La tarea ya está completada',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $task->markAsCompleted($validated['notes'] ?? 'Completado desde notificación');
+
+        // Cancel any pending notifications for this task
+        $this->notificationScheduler->cancelTaskNotifications($task->id);
+
+        return response()->json([
+            'message' => 'Tarea completada',
+            'task' => $task->fresh(),
+        ]);
+    }
+
+    /**
+     * Skip task from notification action.
+     *
+     * This endpoint is called when user taps "Omitir" button
+     * in the push notification. It works the same as skip()
+     * but is optimized for notification actions.
+     */
+    #[OA\Post(
+        path: '/tasks/{taskId}/skip-from-notification',
+        operationId: 'skipTaskFromNotification',
+        summary: 'Saltar tarea desde notificación',
+        description: 'Marca una tarea como saltada desde una acción de notificación push. Funciona igual que skip() pero optimizado para notificaciones.',
+        security: [['sanctum' => []]],
+        tags: ['Tasks'],
+        parameters: [
+            new OA\Parameter(name: 'taskId', in: 'path', required: true, description: 'ID de la tarea', schema: new OA\Schema(type: 'integer', example: 1)),
+        ],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'reason', type: 'string', nullable: true, example: 'Saltado desde notificación'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Tarea saltada',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Tarea saltada'),
+                        new OA\Property(property: 'task', ref: '#/components/schemas/Task'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'No autenticado', content: new OA\JsonContent(ref: '#/components/schemas/UnauthorizedError')),
+            new OA\Response(response: 403, description: 'No autorizado', content: new OA\JsonContent(ref: '#/components/schemas/ForbiddenError')),
+            new OA\Response(response: 404, description: 'Tarea no encontrada', content: new OA\JsonContent(ref: '#/components/schemas/NotFoundError')),
+            new OA\Response(
+                response: 422,
+                description: 'Solo se pueden saltar tareas programadas',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Solo se pueden saltar tareas programadas'),
+                    ]
+                )
+            ),
+        ]
+    )]
+    public function skipFromNotification(Request $request, Task $task): JsonResponse
+    {
+        // Ensure user owns this task's goal
+        if ($task->goal->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'No autorizado'], 403);
+        }
+
+        if (!$task->isScheduled()) {
+            return response()->json([
+                'message' => 'Solo se pueden saltar tareas programadas',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string'],
+        ]);
+
+        $task->markAsSkipped($validated['reason'] ?? 'Saltado desde notificación');
+
+        // Cancel any pending notifications for this task
+        $this->notificationScheduler->cancelTaskNotifications($task->id);
 
         return response()->json([
             'message' => 'Tarea saltada',

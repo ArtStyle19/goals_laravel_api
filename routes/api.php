@@ -49,6 +49,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/tasks/{task}/complete', [TaskController::class, 'complete']);
     Route::post('/tasks/{task}/skip', [TaskController::class, 'skip']);
 
+    // Task actions from notifications (FCM action buttons)
+    Route::post('/tasks/{task}/complete-from-notification', [TaskController::class, 'completeFromNotification']);
+    Route::post('/tasks/{task}/skip-from-notification', [TaskController::class, 'skipFromNotification']);
+
     // Calendar Views
     Route::get('/calendar', [CalendarController::class, 'index']);
     Route::get('/today', [CalendarController::class, 'today']);
@@ -58,5 +62,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/user/fcm-token', [NotificationController::class, 'storeToken']);
     Route::delete('/user/fcm-token', [NotificationController::class, 'removeToken']);
     Route::post('/test-notification', [NotificationController::class, 'sendTest']);
+    Route::post('/test-notification-with-actions', [NotificationController::class, 'sendTestWithActions']);
     Route::get('/notification-status', [NotificationController::class, 'status']);
 });

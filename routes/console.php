@@ -8,6 +8,9 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// Schedule task reminders every minute
-Schedule::command('app:send-test-notification guillermito@gmail.com')->everyMinute();
-// Schedule::command('app:send-task-reminders')->everyMinute();
+// Send FCM notifications when tasks are starting now
+// This sends push notifications with Complete/Skip action buttons
+Schedule::command('tasks:send-start-notifications')->everyMinute();
+
+// Legacy reminders (disabled - using FCM instead)
+// Schedule::command('app:send-task-reminders --type=reminder')->everyMinute();

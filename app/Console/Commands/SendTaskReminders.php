@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Task;
 use App\Services\FCMService;
+use App\Services\TaskNotificationScheduler;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
@@ -16,21 +17,23 @@ class SendTaskReminders extends Command
      *
      * @var string
      */
-    protected $signature = 'app:send-task-reminders';
+    protected $signature = 'app:send-task-reminders {--type=reminder : Type of notification (reminder|start|overdue)}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Send FCM notifications for tasks starting in 15 minutes';
+    protected $description = 'Send FCM notifications for tasks with action buttons (Complete, Skip)';
 
     private FCMService $fcmService;
+    private TaskNotificationScheduler $scheduler;
 
-    public function __construct(FCMService $fcmService)
+    public function __construct(FCMService $fcmService, TaskNotificationScheduler $scheduler)
     {
         parent::__construct();
         $this->fcmService = $fcmService;
+        $this->scheduler = $scheduler;
     }
 
     /**
@@ -38,7 +41,8 @@ class SendTaskReminders extends Command
      */
     public function handle(): int
     {
-        $this->info('Checking for upcoming tasks...');
+        $type = $this->option('type');
+        $this->info("Checking for tasks to send {$type} notifications...");
 
         if (!$this->fcmService->isInitialized()) {
             $this->error('FCM service not initialized. Check credentials.');
@@ -46,11 +50,31 @@ class SendTaskReminders extends Command
             return 1;
         }
 
-        // Find tasks starting in exactly 15 minutes (with 1-minute window)
+        // Determine time window based on notification type
         $now = Carbon::now();
-        $targetTime = $now->copy()->addMinutes(15);
-        $windowStart = $targetTime->copy()->subMinute();
-        $windowEnd = $targetTime->copy()->addMinute();
+
+        switch ($type) {
+            case 'start':
+                // Tasks starting now (within 1 minute window)
+                $windowStart = $now->copy()->subMinute();
+                $windowEnd = $now->copy()->addMinute();
+                $notificationType = 'task_start';
+                break;
+            case 'overdue':
+                // Tasks that should have started but haven't
+                $windowStart = $now->copy()->subHours(1);
+                $windowEnd = $now->copy()->subMinute();
+                $notificationType = 'task_overdue';
+                break;
+            case 'reminder':
+            default:
+                // Tasks starting in 15 minutes
+                $targetTime = $now->copy()->addMinutes(15);
+                $windowStart = $targetTime->copy()->subMinute();
+                $windowEnd = $targetTime->copy()->addMinute();
+                $notificationType = 'task_reminder';
+                break;
+        }
 
         $tasks = Task::with('goal.user')
             ->where('scheduled_at', '>=', $windowStart)
@@ -59,14 +83,15 @@ class SendTaskReminders extends Command
             ->get();
 
         if ($tasks->isEmpty()) {
-            $this->info('No tasks found for reminder.');
+            $this->info('No tasks found for notification.');
             return 0;
         }
 
-        $this->info("Found {$tasks->count()} task(s) for reminder.");
+        $this->info("Found {$tasks->count()} task(s) for {$type} notification.");
 
         $sentCount = 0;
         $failedCount = 0;
+        $skippedCount = 0;
 
         foreach ($tasks as $task) {
             $user = $task->goal->user ?? null;
@@ -77,23 +102,27 @@ class SendTaskReminders extends Command
             }
 
             // Check if already sent (prevent duplicates)
-            $cacheKey = "task_reminder_sent:{$task->id}";
+            $cacheKey = "task_notification_sent:{$task->id}:{$type}";
             if (Cache::has($cacheKey)) {
-                $this->warn("Skipping task {$task->id}: Reminder already sent.");
+                $this->warn("Skipping task {$task->id}: Notification already sent.");
+                $skippedCount++;
                 continue;
             }
 
-            // Send notification
-            $result = $this->fcmService->sendTaskReminder($user, $task);
+            // Send notification with action buttons using the scheduler
+            $result = $this->scheduler->sendImmediateNotification($task, $notificationType);
 
             if ($result['success']) {
                 // Mark as sent (expire after 2 hours to prevent memory bloat)
                 Cache::put($cacheKey, true, now()->addHours(2));
                 $sentCount++;
-                $this->info("✓ Reminder sent for task {$task->id} to user {$user->id}");
+                $this->info("✓ {$type} notification sent for task {$task->id} to user {$user->id}");
+            } elseif ($result['message'] === 'Notification already sent recently') {
+                $skippedCount++;
+                $this->warn("Skipping task {$task->id}: {$result['message']}");
             } else {
                 $failedCount++;
-                $this->error("✗ Failed to send reminder for task {$task->id}: {$result['message']}");
+                $this->error("✗ Failed to send {$type} notification for task {$task->id}: {$result['message']}");
 
                 // If token is invalid, clear it
                 if (isset($result['invalid_token']) && $result['invalid_token']) {
@@ -104,10 +133,12 @@ class SendTaskReminders extends Command
             }
         }
 
-        $this->info("Completed: {$sentCount} sent, {$failedCount} failed.");
+        $this->info("Completed: {$sentCount} sent, {$skippedCount} skipped, {$failedCount} failed.");
         Log::info('SendTaskReminders completed', [
+            'type' => $type,
             'total_tasks' => $tasks->count(),
             'sent' => $sentCount,
+            'skipped' => $skippedCount,
             'failed' => $failedCount,
         ]);
 

@@ -195,4 +195,97 @@ class NotificationController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Send test notification with action buttons (Complete, Skip)
+     *
+     * This endpoint sends a HYBRID message with both notification and data payload.
+     * The notification payload ensures FCM displays the notification automatically
+     * in all app states. The data payload contains action button info for Flutter.
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function sendTestWithActions(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user->fcm_token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No FCM token registered. Please register your device first.',
+                ], 400);
+            }
+
+            $title = $request->input('title', '🧪 Test con Botones');
+            $body = $request->input('body', 'Esta notificación tiene botones de acción (Completar, Omitir)');
+
+            // Build action buttons configuration
+            $actions = [
+                [
+                    'id' => 'complete_task',
+                    'title' => 'Completar',
+                    'action' => 'complete',
+                ],
+                [
+                    'id' => 'skip_task',
+                    'title' => 'Omitir',
+                    'action' => 'skip',
+                ],
+            ];
+
+            // Data payload for Flutter - all values must be strings
+            $data = [
+                'type' => 'test_with_actions',
+                'timestamp' => now()->toIso8601String(),
+                'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+                'show_actions' => 'true',
+                'actions' => json_encode($actions),
+                'action_count' => (string) count($actions),
+                // Individual action data for easier parsing
+                'action_1_id' => 'complete_task',
+                'action_1_title' => 'Completar',
+                'action_2_id' => 'skip_task',
+                'action_2_title' => 'Omitir',
+            ];
+
+            // Send as HYBRID message (notification + data payload)
+            // This ensures FCM displays the notification automatically
+            $result = $this->fcmService->sendToToken($user->fcm_token, $title, $body, $data);
+
+            if ($result['success']) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Test notification with actions sent successfully',
+                ]);
+            }
+
+            // Handle invalid token
+            if (isset($result['invalid_token']) && $result['invalid_token']) {
+                $user->fcm_token = null;
+                $user->save();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'FCM token is invalid and has been removed. Please re-register.',
+                ], 400);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 500);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to send test notification with actions', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send notification',
+            ], 500);
+        }
+    }
 }

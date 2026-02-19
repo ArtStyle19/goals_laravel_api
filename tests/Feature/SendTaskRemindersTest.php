@@ -35,11 +35,15 @@ it('sends reminder for task starting in 15 minutes', function () {
         'title' => 'Test Task Reminder',
     ]);
 
-    // Mock FCM service to expect sendTaskReminder call
+    // Mock FCM service to expect sendTaskNotificationWithActions call
     $this->mockFcmService
-        ->shouldReceive('sendTaskReminder')
+        ->shouldReceive('sendTaskNotificationWithActions')
         ->once()
-        ->with(Mockery::on(fn($u) => $u->id === $user->id), Mockery::on(fn($t) => $t->id === $task->id))
+        ->with(
+            Mockery::on(fn($u) => $u->id === $user->id),
+            Mockery::on(fn($t) => $t->id === $task->id),
+            'task_start'
+        )
         ->andReturn(['success' => true, 'message' => 'Notification sent']);
 
     // Act: Run the command
@@ -72,7 +76,7 @@ it('skips tasks without FCM token', function () {
         ->expectsOutputToContain('No FCM token for user');
 
     // Assert: No FCM call should be made
-    $this->mockFcmService->shouldNotHaveReceived('sendTaskReminder');
+    $this->mockFcmService->shouldNotHaveReceived('sendTaskNotificationWithActions');
 });
 
 it('prevents duplicate reminders with cache', function () {
@@ -97,7 +101,7 @@ it('prevents duplicate reminders with cache', function () {
         ->expectsOutputToContain('Reminder already sent');
 
     // Assert: No FCM call should be made for duplicate
-    $this->mockFcmService->shouldNotHaveReceived('sendTaskReminder');
+    $this->mockFcmService->shouldNotHaveReceived('sendTaskNotificationWithActions');
 });
 
 it('clears invalid FCM tokens', function () {
@@ -115,7 +119,7 @@ it('clears invalid FCM tokens', function () {
 
     // Mock FCM to return invalid token error
     $this->mockFcmService
-        ->shouldReceive('sendTaskReminder')
+        ->shouldReceive('sendTaskNotificationWithActions')
         ->once()
         ->andReturn([
             'success' => false,
@@ -165,7 +169,7 @@ it('finds tasks within 1-minute window of 15 minutes', function () {
 
     // Mock FCM to expect 2 calls (14 and 16 min, not 20)
     $this->mockFcmService
-        ->shouldReceive('sendTaskReminder')
+        ->shouldReceive('sendTaskNotificationWithActions')
         ->twice()
         ->andReturn(['success' => true, 'message' => 'Sent']);
 
@@ -206,7 +210,7 @@ it('skips completed or skipped tasks', function () {
 
     // Mock FCM to expect only 1 call
     $this->mockFcmService
-        ->shouldReceive('sendTaskReminder')
+        ->shouldReceive('sendTaskNotificationWithActions')
         ->once()
         ->andReturn(['success' => true, 'message' => 'Sent']);
 
@@ -251,7 +255,7 @@ it('handles multiple users with different tasks', function () {
 
     // Mock FCM to expect 2 calls
     $this->mockFcmService
-        ->shouldReceive('sendTaskReminder')
+        ->shouldReceive('sendTaskNotificationWithActions')
         ->twice()
         ->andReturn(['success' => true, 'message' => 'Sent']);
 

@@ -179,19 +179,29 @@ class NotificationController extends Controller
     }
 
     /**
-     * Get FCM service status
+     * Get FCM service status for the authenticated user.
      *
+     * Returns server-side FCM configuration status and user-specific
+     * token registration status.
+     *
+     * @param Request $request
      * @return JsonResponse
      */
-    public function status(): JsonResponse
+    public function status(Request $request): JsonResponse
     {
+        $user = $request->user();
         $isInitialized = $this->fcmService->isInitialized();
 
         return response()->json([
             'success' => true,
             'data' => [
-                'fcm_initialized' => $isInitialized,
-                'credentials_exist' => file_exists(config('firebase.credentials.file')),
+                'fcm_configured'     => $isInitialized,
+                'credentials_exist'  => file_exists(config('firebase.credentials.file')),
+                'has_token'          => !empty($user?->fcm_token),
+                'authenticated'      => $user !== null,
+                'token_preview'      => $user?->fcm_token
+                    ? substr($user->fcm_token, 0, 20) . '...'
+                    : null,
             ],
         ]);
     }
@@ -199,9 +209,10 @@ class NotificationController extends Controller
     /**
      * Send test notification with action buttons (Complete, Skip)
      *
-     * This endpoint sends a HYBRID message with both notification and data payload.
-     * The notification payload ensures FCM displays the notification automatically
-     * in all app states. The data payload contains action button info for Flutter.
+     * This endpoint sends a DATA-ONLY message to ensure Flutter displays
+     * the notification with working action buttons. Data-only messages
+     * ensure Flutter always handles the notification display and action
+     * handling, making the buttons functional in all app states.
      *
      * @param Request $request
      * @return JsonResponse
@@ -236,8 +247,11 @@ class NotificationController extends Controller
             ];
 
             // Data payload for Flutter - all values must be strings
+            // IMPORTANT: Include title and body in data so Flutter can display them
             $data = [
                 'type' => 'test_with_actions',
+                'title' => $title,  // For Flutter to display
+                'body' => $body,    // For Flutter to display
                 'timestamp' => now()->toIso8601String(),
                 'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
                 'show_actions' => 'true',
@@ -250,9 +264,10 @@ class NotificationController extends Controller
                 'action_2_title' => 'Omitir',
             ];
 
-            // Send as HYBRID message (notification + data payload)
-            // This ensures FCM displays the notification automatically
-            $result = $this->fcmService->sendToToken($user->fcm_token, $title, $body, $data);
+            // Send as DATA-ONLY message (no notification payload)
+            // This ensures Flutter always handles the notification display
+            // and action buttons work correctly in all app states
+            $result = $this->fcmService->sendDataOnlyMessage($user->fcm_token, $data);
 
             if ($result['success']) {
                 return response()->json([

@@ -361,10 +361,11 @@ class FCMService
     /**
      * Send task notification with action buttons (Complete, Skip)
      *
-     * This method sends a HYBRID message with both notification and data payload.
-     * The notification payload ensures the message is displayed automatically
-     * by FCM in all app states. The data payload contains action button info
-     * that Flutter uses to handle button presses.
+     * This method sends a DATA-ONLY message to ensure Flutter displays
+     * the notification with working action buttons. When FCM sends a message
+     * with a notification payload, Android/iOS displays it natively and
+     * Flutter's action buttons don't work. Data-only messages ensure
+     * Flutter always handles the notification display and action handling.
      *
      * @param \App\Models\User $user
      * @param \App\Models\Task $task
@@ -412,12 +413,15 @@ class FCMService
         ];
 
         // Data payload for Flutter - all values must be strings
+        // IMPORTANT: Include title and body in data so Flutter can display them
         $data = [
             'type' => $notificationType,
             'task_id' => (string) $task->id,
             'goal_id' => (string) $task->goal_id,
             'goal_title' => $task->goal->title ?? '',
             'task_title' => $task->title,
+            'title' => $title,  // For Flutter to display
+            'body' => $body,    // For Flutter to display
             'scheduled_at' => (string) $task->scheduled_at,
             'end_at' => (string) ($task->end_at ?? ''),
             'duration_minutes' => (string) ($task->duration_minutes ?? '60'),
@@ -436,10 +440,10 @@ class FCMService
         // Convert all data values to strings for FCM compatibility
         $stringData = $this->convertDataToStrings($data);
 
-        // Send as HYBRID message (notification + data payload)
-        // This ensures FCM displays the notification automatically
-        // while Flutter can still handle action buttons via data payload
-        return $this->sendToTokenWithActions($user->fcm_token, $title, $body, $stringData);
+        // Send as DATA-ONLY message (no notification payload)
+        // This ensures Flutter always handles the notification display
+        // and action buttons work correctly in all app states
+        return $this->sendDataOnlyMessage($user->fcm_token, $stringData);
     }
 
     /**
@@ -520,107 +524,6 @@ class FCMService
             ];
         } catch (\Exception $e) {
             Log::error('Unexpected error sending FCM data-only message', [
-                'error' => $e->getMessage(),
-            ]);
-
-            return [
-                'success' => false,
-                'message' => 'Unexpected error: ' . $e->getMessage(),
-            ];
-        }
-    }
-
-    /**
-     * Send notification with action buttons support.
-     * Uses high priority and includes data payload for Flutter action handling.
-     *
-     * @param string $token
-     * @param string $title
-     * @param string $body
-     * @param array $data
-     * @return array
-     */
-    private function sendToTokenWithActions(string $token, string $title, string $body, array $data): array
-    {
-        if (!$this->messaging) {
-            return [
-                'success' => false,
-                'message' => 'FCM not initialized',
-            ];
-        }
-
-        try {
-            $notification = Notification::create($title, $body);
-
-            // Android config with high priority and notification channel
-            $androidConfig = [
-                'priority' => 'high',
-                'notification' => [
-                    'channel_id' => 'fcm_task_actions',
-                    'default_sound' => true,
-                    'default_vibrate_timings' => true,
-                ],
-            ];
-
-            // APNS config for iOS
-            $apnsConfig = [
-                'headers' => [
-                    'apns-priority' => '10',
-                ],
-                'payload' => [
-                    'aps' => [
-                        'alert' => [
-                            'title' => $title,
-                            'body' => $body,
-                        ],
-                        'sound' => 'default',
-                        'badge' => 1,
-                        'category' => 'task_actions',
-                    ],
-                ],
-            ];
-
-            // Build message with notification + data payload
-            $message = CloudMessage::new()
-                ->toToken($token)
-                ->withNotification($notification)
-                ->withData($data)
-                ->withAndroidConfig($androidConfig)
-                ->withApnsConfig($apnsConfig);
-
-            $this->messaging->send($message);
-
-            Log::info('FCM notification with actions sent successfully', [
-                'token' => substr($token, 0, 20) . '...',
-                'title' => $title,
-                'task_id' => $data['task_id'] ?? 'unknown',
-            ]);
-
-            return [
-                'success' => true,
-                'message' => 'Notification sent successfully',
-            ];
-        } catch (MessagingException $e) {
-            Log::error('Failed to send FCM notification with actions', [
-                'token' => substr($token, 0, 20) . '...',
-                'error' => $e->getMessage(),
-                'code' => $e->getCode(),
-            ]);
-
-            if ($e->getCode() === 404 || str_contains($e->getMessage(), 'registration-token-not-registered')) {
-                return [
-                    'success' => false,
-                    'message' => 'Invalid token',
-                    'invalid_token' => true,
-                ];
-            }
-
-            return [
-                'success' => false,
-                'message' => $e->getMessage(),
-            ];
-        } catch (\Exception $e) {
-            Log::error('Unexpected error sending FCM notification with actions', [
                 'error' => $e->getMessage(),
             ]);
 

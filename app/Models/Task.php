@@ -164,6 +164,46 @@ class Task extends Model
     }
 
     /**
+     * Record a postpone in the task's notes (audit trail for LLM replan).
+     * Status remains 'scheduled' — the pipeline will assign a new slot.
+     */
+    public function markAsPostponed(?string $reason = null): void
+    {
+        $timestamp = now()->format('Y-m-d H:i');
+        $entry = "[Pospuesta {$timestamp}]";
+        if ($reason) {
+            $entry .= " {$reason}";
+        }
+
+        $currentNotes = $this->notes ?? '';
+        $newNotes = $currentNotes
+            ? "{$currentNotes}\n{$entry}"
+            : $entry;
+
+        $this->update(['notes' => $newNotes]);
+    }
+
+    /**
+     * Restore a skipped task to scheduled status.
+     * Notes are preserved, a recovery entry is appended.
+     */
+    public function markAsRecovered(): void
+    {
+        $timestamp = now()->format('Y-m-d H:i');
+        $entry = "[Recuperada {$timestamp}]";
+
+        $currentNotes = $this->notes ?? '';
+        $newNotes = $currentNotes
+            ? "{$currentNotes}\n{$entry}"
+            : $entry;
+
+        $this->update([
+            'status' => self::STATUS_SCHEDULED,
+            'notes' => $newNotes,
+        ]);
+    }
+
+    /**
      * Lock the task to prevent rescheduling.
      */
     public function lock(): void

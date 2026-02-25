@@ -410,6 +410,11 @@ class FCMService
                 'title' => 'Omitir',
                 'action' => 'skip',
             ],
+            [
+                'id' => 'postpone_task',
+                'title' => 'Posponer',
+                'action' => 'postpone',
+            ],
         ];
 
         // Data payload for Flutter - all values must be strings
@@ -435,6 +440,8 @@ class FCMService
             'action_1_title' => 'Completar',
             'action_2_id' => 'skip_task',
             'action_2_title' => 'Omitir',
+            'action_3_id' => 'postpone_task',
+            'action_3_title' => 'Posponer',
         ];
 
         // Convert all data values to strings for FCM compatibility

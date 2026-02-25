@@ -48,6 +48,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/tasks/{task}', [TaskController::class, 'update']);
     Route::post('/tasks/{task}/complete', [TaskController::class, 'complete']);
     Route::post('/tasks/{task}/skip', [TaskController::class, 'skip']);
+    Route::post('/tasks/{task}/postpone', [TaskController::class, 'postpone']);
+    Route::post('/tasks/{task}/recover', [TaskController::class, 'recover']);
 
     // Calendar Views
     Route::get('/calendar', [CalendarController::class, 'index']);

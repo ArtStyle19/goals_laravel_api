@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Route;
 // ==================== PUBLIC ROUTES ====================
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/auth/google', [AuthController::class, 'loginWithGoogle']);
 
 // ==================== PROTECTED ROUTES ====================
 Route::middleware('auth:sanctum')->group(function () {

@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\GoogleEmailNotVerifiedException;
+use App\Exceptions\InvalidGoogleTokenException;
 use App\Models\User;
+use App\Services\GoogleAuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +16,9 @@ use OpenApi\Attributes as OA;
 
 class AuthController extends Controller
 {
+    public function __construct(
+        private readonly GoogleAuthService $googleAuthService,
+    ) {}
     /**
      * Register a new user.
      */
@@ -213,6 +219,74 @@ class AuthController extends Controller
     {
         return response()->json([
             'user' => $request->user(),
+        ]);
+    }
+
+    /**
+     * Login or register via Google Sign-In.
+     *
+     * Receives the Google ID token from the Flutter app, verifies it
+     * server-side using google/apiclient, and returns a Sanctum token.
+     */
+    #[OA\Post(
+        path: '/auth/google',
+        operationId: 'loginWithGoogle',
+        summary: 'Iniciar sesión con Google',
+        description: 'Autentica o registra al usuario usando un ID token de Google. Retorna un token Sanctum.',
+        tags: ['Auth'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['id_token'],
+                properties: [
+                    new OA\Property(property: 'id_token', type: 'string', description: 'Google ID token (JWT)'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Inicio de sesión con Google exitoso',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Inicio de sesión con Google exitoso'),
+                        new OA\Property(property: 'user', ref: '#/components/schemas/User'),
+                        new OA\Property(property: 'token', type: 'string', example: '3|abc123...'),
+                        new OA\Property(property: 'is_new_user', type: 'boolean', example: false),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Token de Google inválido'),
+            new OA\Response(response: 403, description: 'Email de Google no verificado'),
+            new OA\Response(response: 422, description: 'Error de validación'),
+        ]
+    )]
+    public function loginWithGoogle(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'id_token' => ['required', 'string'],
+        ]);
+
+        try {
+            $payload = $this->googleAuthService->verifyIdToken($validated['id_token']);
+            $user = $this->googleAuthService->findOrCreateUser($payload);
+        } catch (InvalidGoogleTokenException) {
+            return response()->json([
+                'message' => 'Token de Google inválido.',
+            ], 401);
+        } catch (GoogleEmailNotVerifiedException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 403);
+        }
+
+        $token = $user->createToken('google-auth')->plainTextToken;
+
+        return response()->json([
+            'message' => 'Inicio de sesión con Google exitoso',
+            'user' => $user,
+            'token' => $token,
+            'is_new_user' => $user->wasRecentlyCreated,
         ]);
     }
 }

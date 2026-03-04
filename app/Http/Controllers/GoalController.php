@@ -6,7 +6,7 @@ use App\Http\Traits\ResolvesTimezone;
 use App\Models\Goal;
 use App\Models\Task;
 use App\Services\PlannerService;
-// use App\Services\ReplanService;  // Disabled for now - will implement robust replan later
+use App\Services\ReplanService;
 use App\Services\SchedulingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,7 +21,7 @@ class GoalController extends Controller
     public function __construct(
         private SchedulingService $schedulingService,
         private PlannerService $plannerService,
-        // private ReplanService $replanService
+        private ReplanService $replanService,
     ) {}
 
     /**
@@ -716,6 +716,144 @@ class GoalController extends Controller
             'message' => 'Objetivo completado',
             'goal' => $goal->fresh(),
         ]);
+    }
+
+    /**
+     * Replan a goal using LLM, preserving completed tasks.
+     */
+    #[OA\Post(
+        path: '/goals/{goalId}/replan',
+        operationId: 'replanGoal',
+        summary: 'Replanificar objetivo con IA',
+        description: 'Regenera las tareas pendientes usando LLM. Las tareas completadas se mantienen como contexto para generar tareas nuevas que continúen el progreso. Las tareas pendientes y omitidas se eliminan. Funciona con objetivos activos y completados (estos se reactivan).',
+        security: [['sanctum' => []]],
+        tags: ['Goals'],
+        parameters: [
+            new OA\Parameter(name: 'goalId', in: 'path', required: true, description: 'ID del objetivo', schema: new OA\Schema(type: 'integer', example: 1)),
+            new OA\Parameter(ref: '#/components/parameters/X-Timezone'),
+        ],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'description', type: 'string', nullable: true, example: 'Enfocarse más en la parte práctica', description: 'Nueva descripción del objetivo (opcional)'),
+                    new OA\Property(property: 'deadline', type: 'string', format: 'date', nullable: true, example: '2026-06-01', description: 'Nueva fecha límite (opcional, debe ser futura)'),
+                    new OA\Property(
+                        property: 'availability_rules',
+                        type: 'array',
+                        nullable: true,
+                        items: new OA\Items(ref: '#/components/schemas/AvailabilityRule'),
+                        description: 'Nuevas reglas de disponibilidad (opcional)'
+                    ),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Replanificación exitosa',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string', example: 'Plan regenerado exitosamente'),
+                        new OA\Property(property: 'goal', ref: '#/components/schemas/GoalWithTasks'),
+                        new OA\Property(
+                            property: 'replan_stats',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'completed_kept', type: 'integer', example: 5),
+                                new OA\Property(property: 'deleted', type: 'integer', example: 10),
+                                new OA\Property(property: 'generated', type: 'integer', example: 8),
+                            ]
+                        ),
+                        new OA\Property(property: 'warning', type: 'string', nullable: true),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'No autenticado', content: new OA\JsonContent(ref: '#/components/schemas/UnauthorizedError')),
+            new OA\Response(response: 403, description: 'No autorizado', content: new OA\JsonContent(ref: '#/components/schemas/ForbiddenError')),
+            new OA\Response(response: 404, description: 'Objetivo no encontrado', content: new OA\JsonContent(ref: '#/components/schemas/NotFoundError')),
+            new OA\Response(
+                response: 422,
+                description: 'Error en la replanificación',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: false),
+                        new OA\Property(property: 'error', type: 'string', example: 'El deadline ha expirado'),
+                        new OA\Property(property: 'error_code', type: 'string', nullable: true, example: 'deadline_expired'),
+                    ]
+                )
+            ),
+        ]
+    )]
+    public function replan(Request $request, Goal $goal): JsonResponse
+    {
+        // Ensure user owns this goal
+        if ($goal->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'No autorizado'], 403);
+        }
+
+        // Only active or completed goals can be replanned
+        if ($goal->isDraft()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'No se puede replanificar un objetivo en borrador. Usa la generación inicial.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'description' => ['nullable', 'string', 'max:1000'],
+            'deadline' => ['nullable', 'date', 'after:today'],
+            'availability_rules' => ['nullable', 'array', 'min:1'],
+            'availability_rules.*.day' => ['required_with:availability_rules', 'string', Rule::in(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])],
+            'availability_rules.*.start' => ['required_with:availability_rules', 'date_format:H:i'],
+            'availability_rules.*.end' => ['required_with:availability_rules', 'date_format:H:i', 'after:availability_rules.*.start'],
+        ]);
+
+        // Validate availability blocks if provided
+        if (!empty($validated['availability_rules'])) {
+            $blockValidation = $this->schedulingService->validateBlocks(
+                $validated['availability_rules'],
+                $goal->session_duration_minutes
+            );
+
+            if (!$blockValidation['valid']) {
+                return response()->json([
+                    'message' => 'Los bloques de disponibilidad no son válidos',
+                    'errors' => ['availability_rules' => $blockValidation['errors']],
+                ], 422);
+            }
+        }
+
+        $timezone = $this->resolveTimezone($request);
+        $newDescription = $validated['description'] ?? null;
+        $newDeadline = $validated['deadline'] ?? null;
+        $newAvailabilityRules = $validated['availability_rules'] ?? null;
+
+        $result = $this->replanService->replan($goal, $timezone, $newDescription, $newDeadline, $newAvailabilityRules);
+
+        if (!$result['success']) {
+            $response = [
+                'success' => false,
+                'error' => $result['error'],
+            ];
+
+            if (isset($result['error_code'])) {
+                $response['error_code'] = $result['error_code'];
+            }
+
+            return response()->json($response, 422);
+        }
+
+        $goal->load('tasks');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Plan regenerado exitosamente',
+            'goal' => $goal,
+            'replan_stats' => $result['replan_stats'],
+            'warning' => $result['warning'],
+        ], 201);
     }
 
     /**

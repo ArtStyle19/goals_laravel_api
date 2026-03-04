@@ -37,6 +37,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/goals/{goal}/generate', [GoalController::class, 'generate']);
     Route::get('/goals/{goal}/stats', [GoalController::class, 'stats']);
     Route::post('/goals/{goal}/complete', [GoalController::class, 'complete']);
+    Route::post('/goals/{goal}/replan', [GoalController::class, 'replan']);
 
     // Route::put('/goals/{goal}/availability', [GoalController::class, 'updateAvailability']);
     // Route::put('/goals/{goal}/deadline', [GoalController::class, 'updateDeadline']);

@@ -58,6 +58,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/today', [CalendarController::class, 'today']);
     Route::get('/next', [CalendarController::class, 'next']);
 
+    // Statistics
+    Route::get('/stats/overview', [CalendarController::class, 'statsOverview']);
+
     // FCM Notifications
     Route::post('/user/fcm-token', [NotificationController::class, 'storeToken']);
     Route::delete('/user/fcm-token', [NotificationController::class, 'removeToken']);

@@ -1,0 +1,2495 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Goals Planner API",
+        "description": "API REST para la aplicación móvil Goals Planner. Permite gestionar objetivos personales, generar planes de estudio con IA, programar tareas en calendario y hacer seguimiento del progreso.",
+        "contact": {
+            "name": "Goals Planner Team",
+            "email": "support@goalsplanner.app"
+        },
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "/api",
+            "description": "API Server"
+        }
+    ],
+    "paths": {
+        "/register": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Registrar nuevo usuario",
+                "description": "Crea una nueva cuenta de usuario y devuelve un token de autenticación Sanctum.",
+                "operationId": "register",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "email",
+                                    "password",
+                                    "password_confirmation"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "Juan Pérez"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "maxLength": 255,
+                                        "example": "juan@example.com"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "minLength": 8,
+                                        "example": "password123"
+                                    },
+                                    "password_confirmation": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "example": "password123"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Usuario registrado exitosamente",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Usuario registrado exitosamente"
+                                        },
+                                        "user": {
+                                            "$ref": "#/components/schemas/User"
+                                        },
+                                        "token": {
+                                            "description": "Token Bearer de Sanctum",
+                                            "type": "string",
+                                            "example": "1|abc123def456..."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Error de validación",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/login": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Iniciar sesión",
+                "description": "Autentica al usuario con email y contraseña. Devuelve un token Bearer de Sanctum.",
+                "operationId": "login",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email",
+                                    "password"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "juan@example.com"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "example": "password123"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Inicio de sesión exitoso",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Inicio de sesión exitoso"
+                                        },
+                                        "user": {
+                                            "$ref": "#/components/schemas/User"
+                                        },
+                                        "token": {
+                                            "type": "string",
+                                            "example": "2|xyz789abc012..."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Credenciales incorrectas",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/logout": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Cerrar sesión",
+                "description": "Revoca el token actual del usuario autenticado.",
+                "operationId": "logout",
+                "responses": {
+                    "200": {
+                        "description": "Sesión cerrada exitosamente",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Sesión cerrada exitosamente"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/me": {
+            "get": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Obtener usuario autenticado",
+                "description": "Devuelve la información del usuario autenticado.",
+                "operationId": "me",
+                "responses": {
+                    "200": {
+                        "description": "Datos del usuario",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "user": {
+                                            "$ref": "#/components/schemas/User"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/calendar": {
+            "get": {
+                "tags": [
+                    "Calendar"
+                ],
+                "summary": "Vista de calendario",
+                "description": "Devuelve las tareas programadas en un rango de fechas, ideal para renderizar un calendario. Las tareas incluyen información del objetivo padre.",
+                "operationId": "calendarIndex",
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "description": "Fecha de inicio (YYYY-MM-DD)",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2026-02-01"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "description": "Fecha de fin (YYYY-MM-DD), debe ser >= from",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2026-02-28"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tareas en el rango de fechas",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "from": {
+                                            "type": "string",
+                                            "format": "date",
+                                            "example": "2026-02-01"
+                                        },
+                                        "to": {
+                                            "type": "string",
+                                            "format": "date",
+                                            "example": "2026-02-28"
+                                        },
+                                        "tasks": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CalendarTask"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer",
+                                            "example": 12
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Error de validación",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/today": {
+            "get": {
+                "tags": [
+                    "Calendar"
+                ],
+                "summary": "Tareas de hoy",
+                "description": "Devuelve todas las tareas programadas para hoy según la zona horaria del usuario (header X-Timezone). Incluye totales de tiempo.",
+                "operationId": "todayTasks",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/X-Timezone"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tareas del día",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "date": {
+                                            "type": "string",
+                                            "format": "date",
+                                            "example": "2026-02-09"
+                                        },
+                                        "tasks": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "goal_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "goal_title": {
+                                                        "type": "string",
+                                                        "example": "Aprender Laravel"
+                                                    },
+                                                    "title": {
+                                                        "type": "string",
+                                                        "example": "Sesión 5: Eloquent ORM"
+                                                    },
+                                                    "description": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "scheduled_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    "end_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    "duration_minutes": {
+                                                        "type": "integer",
+                                                        "example": 60
+                                                    },
+                                                    "status": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "scheduled",
+                                                            "completed",
+                                                            "skipped"
+                                                        ]
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "total_tasks": {
+                                            "type": "integer",
+                                            "example": 3
+                                        },
+                                        "total_minutes": {
+                                            "type": "integer",
+                                            "example": 180
+                                        },
+                                        "total_hours": {
+                                            "type": "number",
+                                            "format": "float",
+                                            "example": 3
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/next": {
+            "get": {
+                "tags": [
+                    "Calendar"
+                ],
+                "summary": "Próxima tarea",
+                "description": "Devuelve la próxima tarea programada (scheduled) del usuario. Incluye un texto legible de cuánto falta para que inicie.",
+                "operationId": "nextTask",
+                "responses": {
+                    "200": {
+                        "description": "Próxima tarea encontrada (o null si no hay)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "oneOf": [
+                                        {
+                                            "properties": {
+                                                "task": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 5
+                                                        },
+                                                        "goal_id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "goal_title": {
+                                                            "type": "string",
+                                                            "example": "Aprender Laravel"
+                                                        },
+                                                        "title": {
+                                                            "type": "string",
+                                                            "example": "Sesión 5: Eloquent ORM"
+                                                        },
+                                                        "description": {
+                                                            "type": "string",
+                                                            "nullable": true
+                                                        },
+                                                        "scheduled_at": {
+                                                            "type": "string",
+                                                            "format": "date-time"
+                                                        },
+                                                        "end_at": {
+                                                            "type": "string",
+                                                            "format": "date-time"
+                                                        },
+                                                        "duration_minutes": {
+                                                            "type": "integer",
+                                                            "example": 60
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "starts_in": {
+                                                    "type": "string",
+                                                    "example": "2 hours from now"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        {
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "example": "No hay tareas próximas"
+                                                },
+                                                "task": {
+                                                    "type": "string",
+                                                    "example": null,
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/goals": {
+            "get": {
+                "tags": [
+                    "Goals"
+                ],
+                "summary": "Listar objetivos del usuario",
+                "description": "Devuelve todos los objetivos del usuario autenticado con conteos de tareas totales y completadas.",
+                "operationId": "listGoals",
+                "responses": {
+                    "200": {
+                        "description": "Lista de objetivos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "goals": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/GoalWithCounts"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Goals"
+                ],
+                "summary": "Crear nuevo objetivo",
+                "description": "Crea un objetivo en estado draft con reglas de disponibilidad semanal. Calcula automáticamente la capacidad (sesiones disponibles hasta el deadline).",
+                "operationId": "createGoal",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/X-Timezone"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "title",
+                                    "deadline",
+                                    "session_duration_minutes",
+                                    "availability_rules"
+                                ],
+                                "properties": {
+                                    "title": {
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "Aprender Laravel"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "example": "Curso completo de Laravel desde cero hasta avanzado",
+                                        "nullable": true
+                                    },
+                                    "deadline": {
+                                        "description": "Debe ser posterior a hoy",
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2026-06-01"
+                                    },
+                                    "session_duration_minutes": {
+                                        "description": "Duración de cada sesión de estudio",
+                                        "type": "integer",
+                                        "enum": [
+                                            30,
+                                            45,
+                                            60,
+                                            90,
+                                            120
+                                        ],
+                                        "example": 60
+                                    },
+                                    "availability_rules": {
+                                        "description": "Bloques de disponibilidad semanal. Cada bloque debe ser múltiplo de session_duration_minutes.",
+                                        "type": "array",
+                                        "items": {
+                                            "$ref": "#/components/schemas/AvailabilityRule"
+                                        },
+                                        "minItems": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Objetivo creado exitosamente",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Objetivo creado exitosamente"
+                                        },
+                                        "goal": {
+                                            "$ref": "#/components/schemas/Goal"
+                                        },
+                                        "capacity": {
+                                            "properties": {
+                                                "total_sessions": {
+                                                    "type": "integer",
+                                                    "example": 48
+                                                },
+                                                "total_hours": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 48
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "warnings": {
+                                            "description": "Advertencias sobre bloques de disponibilidad (opcional)",
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Error de validación",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/goals/{goalId}": {
+            "get": {
+                "tags": [
+                    "Goals"
+                ],
+                "summary": "Ver detalle de un objetivo",
+                "description": "Devuelve un objetivo con todas sus tareas ordenadas por orden.",
+                "operationId": "showGoal",
+                "parameters": [
+                    {
+                        "name": "goalId",
+                        "in": "path",
+                        "description": "ID del objetivo",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Detalle del objetivo con tareas",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "goal": {
+                                            "$ref": "#/components/schemas/GoalWithTasks"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "No autorizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Objetivo no encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Goals"
+                ],
+                "summary": "Actualizar objetivo",
+                "description": "Actualiza el título y/o descripción de un objetivo.",
+                "operationId": "updateGoal",
+                "parameters": [
+                    {
+                        "name": "goalId",
+                        "in": "path",
+                        "description": "ID del objetivo",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "title": {
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "Aprender Laravel Avanzado"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "example": "Enfoque en APIs REST y testing",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Objetivo actualizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Objetivo actualizado"
+                                        },
+                                        "goal": {
+                                            "$ref": "#/components/schemas/Goal"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "No autorizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Objetivo no encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Error de validación",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Goals"
+                ],
+                "summary": "Eliminar objetivo",
+                "description": "Elimina un objetivo y todas sus tareas asociadas (cascade).",
+                "operationId": "deleteGoal",
+                "parameters": [
+                    {
+                        "name": "goalId",
+                        "in": "path",
+                        "description": "ID del objetivo",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Objetivo eliminado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Objetivo eliminado"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "No autorizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Objetivo no encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/goals/{goalId}/tasks": {
+            "get": {
+                "tags": [
+                    "Tasks"
+                ],
+                "summary": "Listar tareas de un objetivo",
+                "description": "Devuelve todas las tareas de un objetivo ordenadas por fecha programada, con información de duración.",
+                "operationId": "listGoalTasks",
+                "parameters": [
+                    {
+                        "name": "goalId",
+                        "in": "path",
+                        "description": "ID del objetivo",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lista de tareas",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "tasks": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/TaskDetail"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "No autorizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Objetivo no encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Goals"
+                ],
+                "summary": "Agregar tareas manualmente",
+                "description": "Agrega tareas manualmente a un objetivo en estado draft. Las tareas se programan automáticamente en los slots de disponibilidad. El objetivo pasa a estado active.",
+                "operationId": "addTasksToGoal",
+                "parameters": [
+                    {
+                        "name": "goalId",
+                        "in": "path",
+                        "description": "ID del objetivo (debe estar en draft)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "$ref": "#/components/parameters/X-Timezone"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "tasks"
+                                ],
+                                "properties": {
+                                    "tasks": {
+                                        "type": "array",
+                                        "items": {
+                                            "required": [
+                                                "title"
+                                            ],
+                                            "properties": {
+                                                "title": {
+                                                    "type": "string",
+                                                    "maxLength": 255,
+                                                    "example": "Sesión 1: Introducción"
+                                                },
+                                                "description": {
+                                                    "type": "string",
+                                                    "example": "Conceptos básicos del tema",
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "minItems": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Tareas agregadas exitosamente",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Tareas agregadas exitosamente"
+                                        },
+                                        "goal": {
+                                            "$ref": "#/components/schemas/GoalWithTasks"
+                                        },
+                                        "stats": {
+                                            "properties": {
+                                                "total_tasks": {
+                                                    "type": "integer",
+                                                    "example": 10
+                                                },
+                                                "total_hours": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 10
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "No autorizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Error de validación o slots insuficientes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "No hay suficientes slots disponibles"
+                                        },
+                                        "available_slots": {
+                                            "type": "integer",
+                                            "example": 5
+                                        },
+                                        "requested_tasks": {
+                                            "type": "integer",
+                                            "example": 10
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/goals/{goalId}/stats": {
+            "get": {
+                "tags": [
+                    "Goals"
+                ],
+                "summary": "Estadísticas del objetivo",
+                "description": "Devuelve métricas de progreso: tareas completadas/pendientes, horas, porcentaje de avance y si va en tiempo.",
+                "operationId": "goalStats",
+                "parameters": [
+                    {
+                        "name": "goalId",
+                        "in": "path",
+                        "description": "ID del objetivo",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "$ref": "#/components/parameters/X-Timezone"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Estadísticas del objetivo",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "stats": {
+                                            "$ref": "#/components/schemas/GoalStats"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "No autorizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Objetivo no encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/goals/{goalId}/generate": {
+            "post": {
+                "tags": [
+                    "Goals"
+                ],
+                "summary": "Generar plan con IA",
+                "description": "Genera un plan de tareas usando LLM (IA) para un objetivo en estado draft. Las tareas se crean y programan automáticamente. El objetivo pasa a estado active.",
+                "operationId": "generateGoalPlan",
+                "parameters": [
+                    {
+                        "name": "goalId",
+                        "in": "path",
+                        "description": "ID del objetivo (debe estar en draft)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "$ref": "#/components/parameters/X-Timezone"
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Plan generado exitosamente",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Plan generado exitosamente"
+                                        },
+                                        "goal": {
+                                            "$ref": "#/components/schemas/GoalWithTasks"
+                                        },
+                                        "stats": {
+                                            "properties": {
+                                                "total_tasks": {
+                                                    "type": "integer",
+                                                    "example": 15
+                                                },
+                                                "total_hours": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 15
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "warning": {
+                                            "description": "Advertencia del planificador (si aplica)",
+                                            "type": "string",
+                                            "example": null,
+                                            "nullable": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "No autorizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Error al generar plan o objetivo no está en draft",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Solo se pueden generar tareas para objetivos en estado draft"
+                                        },
+                                        "suggestion": {
+                                            "type": "string",
+                                            "example": "Intenta de nuevo o agrega tareas manualmente"
+                                        },
+                                        "manual_endpoint": {
+                                            "type": "string",
+                                            "example": "/api/goals/1/tasks"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/goals/{goalId}/complete": {
+            "post": {
+                "tags": [
+                    "Goals"
+                ],
+                "summary": "Completar objetivo",
+                "description": "Marca un objetivo como completado. No se puede completar un objetivo que ya está completado.",
+                "operationId": "completeGoal",
+                "parameters": [
+                    {
+                        "name": "goalId",
+                        "in": "path",
+                        "description": "ID del objetivo",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Objetivo completado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Objetivo completado"
+                                        },
+                                        "goal": {
+                                            "$ref": "#/components/schemas/Goal"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "No autorizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Objetivo no encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Objetivo ya completado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "El objetivo ya está completado"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/tasks/{taskId}": {
+            "get": {
+                "tags": [
+                    "Tasks"
+                ],
+                "summary": "Ver detalle de una tarea",
+                "description": "Devuelve información detallada de una tarea incluyendo el título del objetivo padre.",
+                "operationId": "showTask",
+                "parameters": [
+                    {
+                        "name": "taskId",
+                        "in": "path",
+                        "description": "ID de la tarea",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Detalle de la tarea",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "task": {
+                                            "$ref": "#/components/schemas/TaskDetail"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "No autorizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Tarea no encontrada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Tasks"
+                ],
+                "summary": "Actualizar notas de tarea",
+                "description": "Permite actualizar las notas personales de una tarea.",
+                "operationId": "updateTask",
+                "parameters": [
+                    {
+                        "name": "taskId",
+                        "in": "path",
+                        "description": "ID de la tarea",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "notes": {
+                                        "type": "string",
+                                        "example": "Revisar el capítulo 3 antes de la sesión",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Tarea actualizada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Tarea actualizada"
+                                        },
+                                        "task": {
+                                            "$ref": "#/components/schemas/Task"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "No autorizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Tarea no encontrada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Error de validación",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/tasks/{taskId}/complete": {
+            "post": {
+                "tags": [
+                    "Tasks"
+                ],
+                "summary": "Completar tarea",
+                "description": "Marca una tarea como completada. Opcionalmente se pueden agregar notas. No se puede completar una tarea ya completada.",
+                "operationId": "completeTask",
+                "parameters": [
+                    {
+                        "name": "taskId",
+                        "in": "path",
+                        "description": "ID de la tarea",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "notes": {
+                                        "type": "string",
+                                        "example": "Completado con éxito, tema bien comprendido",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Tarea completada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Tarea completada"
+                                        },
+                                        "task": {
+                                            "$ref": "#/components/schemas/Task"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "No autorizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Tarea no encontrada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Tarea ya completada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "La tarea ya está completada"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/tasks/{taskId}/skip": {
+            "post": {
+                "tags": [
+                    "Tasks"
+                ],
+                "summary": "Saltar tarea",
+                "description": "Marca una tarea programada como saltada (skipped). Solo aplica a tareas en estado scheduled. Se puede incluir una razón.",
+                "operationId": "skipTask",
+                "parameters": [
+                    {
+                        "name": "taskId",
+                        "in": "path",
+                        "description": "ID de la tarea",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "reason": {
+                                        "type": "string",
+                                        "example": "No tuve tiempo hoy",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Tarea saltada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Tarea saltada"
+                                        },
+                                        "task": {
+                                            "$ref": "#/components/schemas/Task"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autenticado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "No autorizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Tarea no encontrada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Solo se pueden saltar tareas programadas",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Solo se pueden saltar tareas programadas"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "AvailabilityRule": {
+                "title": "AvailabilityRule",
+                "description": "Regla de disponibilidad semanal",
+                "required": [
+                    "day",
+                    "start",
+                    "end"
+                ],
+                "properties": {
+                    "day": {
+                        "description": "Weekly availability rule schema.\n\nDescribes a single time block on a specific day of the week\nduring which the user is available for study sessions.",
+                        "type": "string",
+                        "enum": [
+                            "monday",
+                            "tuesday",
+                            "wednesday",
+                            "thursday",
+                            "friday",
+                            "saturday",
+                            "sunday"
+                        ],
+                        "example": "monday"
+                    },
+                    "start": {
+                        "description": "Hora de inicio (HH:mm)",
+                        "type": "string",
+                        "format": "time",
+                        "example": "09:00"
+                    },
+                    "end": {
+                        "description": "Hora de fin (HH:mm)",
+                        "type": "string",
+                        "format": "time",
+                        "example": "12:00"
+                    }
+                },
+                "type": "object"
+            },
+            "CalendarTask": {
+                "title": "CalendarTask",
+                "description": "Tarea formateada para vista de calendario",
+                "properties": {
+                    "id": {
+                        "description": "Task formatted for calendar views.\n\nSimplified task representation that includes the parent goal's\ntitle, used by the calendar endpoints.",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "goal_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "goal_title": {
+                        "type": "string",
+                        "example": "Aprender Laravel"
+                    },
+                    "title": {
+                        "type": "string",
+                        "example": "Introducción a Laravel"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Instalar Laravel y crear tu primer proyecto",
+                        "nullable": true
+                    },
+                    "scheduled_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-02-10T09:00:00+00:00"
+                    },
+                    "end_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-02-10T10:00:00+00:00"
+                    },
+                    "duration_minutes": {
+                        "type": "integer",
+                        "example": 60
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "scheduled",
+                            "completed",
+                            "skipped"
+                        ],
+                        "example": "scheduled"
+                    },
+                    "is_locked": {
+                        "type": "boolean",
+                        "example": false
+                    }
+                },
+                "type": "object"
+            },
+            "ForbiddenError": {
+                "title": "ForbiddenError",
+                "description": "Error de autorización (403)",
+                "properties": {
+                    "message": {
+                        "description": "Forbidden error response schema (HTTP 403).\n\nReturned when the authenticated user does not own the\nrequested resource.",
+                        "type": "string",
+                        "example": "No autorizado"
+                    }
+                },
+                "type": "object"
+            },
+            "Goal": {
+                "title": "Goal",
+                "description": "Modelo de objetivo/meta",
+                "required": [
+                    "id",
+                    "user_id",
+                    "title",
+                    "deadline",
+                    "session_duration_minutes",
+                    "availability_rules",
+                    "status",
+                    "created_at",
+                    "updated_at"
+                ],
+                "properties": {
+                    "id": {
+                        "description": "Goal resource schema.\n\nRepresents a user's learning goal with its configuration\n(availability rules, session duration, deadline).",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "user_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "title": {
+                        "type": "string",
+                        "example": "Aprender Laravel"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Curso completo de Laravel desde cero",
+                        "nullable": true
+                    },
+                    "deadline": {
+                        "type": "string",
+                        "format": "date",
+                        "example": "2026-06-01"
+                    },
+                    "session_duration_minutes": {
+                        "type": "integer",
+                        "enum": [
+                            30,
+                            45,
+                            60,
+                            90,
+                            120
+                        ],
+                        "example": 60
+                    },
+                    "availability_rules": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AvailabilityRule"
+                        }
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "draft",
+                            "active",
+                            "completed"
+                        ],
+                        "example": "draft"
+                    },
+                    "total_sessions": {
+                        "type": "integer",
+                        "example": 24,
+                        "nullable": true
+                    },
+                    "total_hours": {
+                        "description": "Total de horas planificadas",
+                        "type": "string",
+                        "example": "24.0",
+                        "nullable": true
+                    },
+                    "completed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": null,
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-02-05T10:00:00.000000Z"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-02-05T10:00:00.000000Z"
+                    }
+                },
+                "type": "object"
+            },
+            "GoalStats": {
+                "title": "GoalStats",
+                "description": "Estadísticas de progreso de un objetivo",
+                "properties": {
+                    "total_tasks": {
+                        "description": "Goal progress statistics schema.\n\nAggregated metrics about a goal's progress including completion\npercentages, hours tracked, and whether the user is on schedule.",
+                        "type": "integer",
+                        "example": 20
+                    },
+                    "completed_tasks": {
+                        "type": "integer",
+                        "example": 8
+                    },
+                    "skipped_tasks": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "pending_tasks": {
+                        "type": "integer",
+                        "example": 11
+                    },
+                    "progress_percentage": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 40
+                    },
+                    "total_hours_planned": {
+                        "type": "string",
+                        "example": "20.0"
+                    },
+                    "hours_completed": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 8
+                    },
+                    "hours_remaining": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 11
+                    },
+                    "days_until_deadline": {
+                        "type": "integer",
+                        "example": 45
+                    },
+                    "on_track": {
+                        "type": "boolean",
+                        "example": true
+                    }
+                },
+                "type": "object"
+            },
+            "GoalWithCounts": {
+                "title": "GoalWithCounts",
+                "description": "Goal con conteos de tareas (usado en listados)",
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/Goal"
+                    },
+                    {
+                        "properties": {
+                            "tasks_count": {
+                                "description": "Total de tareas",
+                                "type": "integer",
+                                "example": 10
+                            },
+                            "completed_tasks_count": {
+                                "description": "Tareas completadas",
+                                "type": "integer",
+                                "example": 3
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "GoalWithTasks": {
+                "title": "GoalWithTasks",
+                "description": "Goal con lista completa de tareas",
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/Goal"
+                    },
+                    {
+                        "properties": {
+                            "tasks": {
+                                "description": "Goal with nested tasks schema.\n\nExtends the base Goal with the full list of associated tasks,\ntypically returned by the goal detail endpoint.",
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/Task"
+                                }
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "NotFoundError": {
+                "title": "NotFoundError",
+                "description": "Recurso no encontrado (404)",
+                "properties": {
+                    "message": {
+                        "description": "Not found error response schema (HTTP 404).\n\nReturned when a requested resource does not exist.",
+                        "type": "string",
+                        "example": "No query results for model."
+                    }
+                },
+                "type": "object"
+            },
+            "Task": {
+                "title": "Task",
+                "description": "Modelo de tarea programada",
+                "required": [
+                    "id",
+                    "goal_id",
+                    "title",
+                    "order",
+                    "scheduled_at",
+                    "end_at",
+                    "duration_minutes",
+                    "status",
+                    "is_locked",
+                    "created_at",
+                    "updated_at"
+                ],
+                "properties": {
+                    "id": {
+                        "description": "Task resource schema.\n\nRepresents a scheduled study session belonging to a goal.",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "goal_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "title": {
+                        "type": "string",
+                        "example": "Introducción a Laravel"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Instalar Laravel y crear tu primer proyecto",
+                        "nullable": true
+                    },
+                    "order": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "scheduled_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-02-10T09:00:00.000000Z"
+                    },
+                    "end_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-02-10T10:00:00.000000Z"
+                    },
+                    "duration_minutes": {
+                        "type": "integer",
+                        "example": 60
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "scheduled",
+                            "completed",
+                            "skipped"
+                        ],
+                        "example": "scheduled"
+                    },
+                    "is_locked": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "notes": {
+                        "type": "string",
+                        "example": null,
+                        "nullable": true
+                    },
+                    "completed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": null,
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-02-05T10:00:00.000000Z"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-02-05T10:00:00.000000Z"
+                    }
+                },
+                "type": "object"
+            },
+            "TaskDetail": {
+                "title": "TaskDetail",
+                "description": "Tarea con información del objetivo padre",
+                "properties": {
+                    "id": {
+                        "description": "Task detail schema with parent goal info.\n\nExtended task representation that includes the parent goal's\ntitle, used by task show/list endpoints.",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "goal_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "goal_title": {
+                        "type": "string",
+                        "example": "Aprender Laravel"
+                    },
+                    "title": {
+                        "type": "string",
+                        "example": "Introducción a Laravel"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Instalar Laravel",
+                        "nullable": true
+                    },
+                    "order": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "scheduled_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-02-10T09:00:00.000000Z"
+                    },
+                    "end_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-02-10T10:00:00.000000Z"
+                    },
+                    "duration_minutes": {
+                        "type": "integer",
+                        "example": 60
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "scheduled",
+                            "completed",
+                            "skipped"
+                        ],
+                        "example": "scheduled"
+                    },
+                    "is_locked": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "notes": {
+                        "type": "string",
+                        "example": null,
+                        "nullable": true
+                    },
+                    "completed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": null,
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "UnauthorizedError": {
+                "title": "UnauthorizedError",
+                "description": "Error de autenticación (401)",
+                "properties": {
+                    "message": {
+                        "description": "Unauthorized error response schema (HTTP 401).\n\nReturned when a request lacks valid authentication credentials.",
+                        "type": "string",
+                        "example": "Unauthenticated."
+                    }
+                },
+                "type": "object"
+            },
+            "User": {
+                "title": "User",
+                "description": "Modelo de usuario",
+                "required": [
+                    "id",
+                    "name",
+                    "email",
+                    "created_at",
+                    "updated_at"
+                ],
+                "properties": {
+                    "id": {
+                        "description": "User resource schema.\n\nRepresents the public-facing structure of a User model\nas returned by the API (excludes sensitive fields like password).",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Juan Pérez"
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "juan@example.com"
+                    },
+                    "email_verified_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": null,
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-02-05T10:00:00.000000Z"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-02-05T10:00:00.000000Z"
+                    }
+                },
+                "type": "object"
+            },
+            "ValidationError": {
+                "title": "ValidationError",
+                "description": "Error de validación (422)",
+                "properties": {
+                    "message": {
+                        "description": "Validation error response schema (HTTP 422).\n\nStandard Laravel validation error format with a message\nand a keyed object of field-level error arrays.",
+                        "type": "string",
+                        "example": "The given data was invalid."
+                    },
+                    "errors": {
+                        "description": "Objeto con los campos y sus mensajes de error",
+                        "type": "object",
+                        "example": "{\"email\": [\"The email field is required.\"]}"
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "parameters": {
+            "X-Timezone": {
+                "name": "X-Timezone",
+                "in": "header",
+                "description": "Zona horaria IANA del cliente (ej: America/Mexico_City). Por defecto: UTC",
+                "required": false,
+                "schema": {
+                    "type": "string",
+                    "example": "America/Mexico_City"
+                }
+            }
+        },
+        "securitySchemes": {
+            "sanctum": {
+                "type": "http",
+                "description": "Ingresa tu token de Sanctum. Obtén uno via POST /api/register o POST /api/login",
+                "bearerFormat": "plaintext",
+                "scheme": "bearer"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Auth",
+            "description": "Autenticación y gestión de sesión"
+        },
+        {
+            "name": "Goals",
+            "description": "CRUD y acciones sobre objetivos"
+        },
+        {
+            "name": "Tasks",
+            "description": "Gestión de tareas individuales"
+        },
+        {
+            "name": "Calendar",
+            "description": "Vistas de calendario y tareas del día"
+        }
+    ]
+}

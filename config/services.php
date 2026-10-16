@@ -53,4 +53,18 @@ return [
         'temperature' => (float) env('LLM_TEMPERATURE', 0.7),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Google OAuth Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Web Client ID used to verify Google ID tokens server-side.
+    | This is the same Web Client ID used in Flutter's GoogleSignIn(serverClientId).
+    |
+    */
+
+    'google' => [
+        'client_id' => env('GOOGLE_WEB_CLIENT_ID'),
+    ],
+
 ];

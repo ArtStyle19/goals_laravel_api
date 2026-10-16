@@ -136,12 +136,23 @@ class Goal extends Model
     }
 
     /**
+     * Reactivate a completed goal (e.g. after a replan).
+     */
+    public function reactivate(): void
+    {
+        $this->update([
+            'status' => self::STATUS_ACTIVE,
+            'completed_at' => null,
+        ]);
+    }
+
+    /**
      * Calculate and update the total sessions and hours.
      */
     public function calculateCapacity(int $totalSessions): void
     {
         $totalHours = ($totalSessions * $this->session_duration_minutes) / 60;
-        
+
         $this->update([
             'total_sessions' => $totalSessions,
             'total_hours' => round($totalHours, 1),

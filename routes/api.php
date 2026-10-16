@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\GoalController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\TaskController;
 use Illuminate\Support\Facades\Route;
 
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\Route;
 // ==================== PUBLIC ROUTES ====================
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/auth/google', [AuthController::class, 'loginWithGoogle']);
 
 // ==================== PROTECTED ROUTES ====================
 Route::middleware('auth:sanctum')->group(function () {
@@ -35,6 +37,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/goals/{goal}/generate', [GoalController::class, 'generate']);
     Route::get('/goals/{goal}/stats', [GoalController::class, 'stats']);
     Route::post('/goals/{goal}/complete', [GoalController::class, 'complete']);
+    Route::post('/goals/{goal}/replan', [GoalController::class, 'replan']);
 
     // Route::put('/goals/{goal}/availability', [GoalController::class, 'updateAvailability']);
     // Route::put('/goals/{goal}/deadline', [GoalController::class, 'updateDeadline']);
@@ -47,10 +50,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/tasks/{task}', [TaskController::class, 'update']);
     Route::post('/tasks/{task}/complete', [TaskController::class, 'complete']);
     Route::post('/tasks/{task}/skip', [TaskController::class, 'skip']);
+    Route::post('/tasks/{task}/postpone', [TaskController::class, 'postpone']);
+    Route::post('/tasks/{task}/recover', [TaskController::class, 'recover']);
 
     // Calendar Views
     Route::get('/calendar', [CalendarController::class, 'index']);
     Route::get('/today', [CalendarController::class, 'today']);
     Route::get('/next', [CalendarController::class, 'next']);
-});
 
+    // FCM Notifications
+    Route::post('/user/fcm-token', [NotificationController::class, 'storeToken']);
+    Route::delete('/user/fcm-token', [NotificationController::class, 'removeToken']);
+    Route::post('/test-notification', [NotificationController::class, 'sendTest']);
+    Route::post('/test-notification-with-actions', [NotificationController::class, 'sendTestWithActions']);
+    Route::get('/notification-status', [NotificationController::class, 'status']);
+});

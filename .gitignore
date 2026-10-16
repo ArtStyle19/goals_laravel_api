@@ -25,3 +25,14 @@ Thumbs.db
 
 
 *.txt
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Firebase / Google credentials
+*firebase-adminsdk*.json
+*service-account*.json
+firebase-credentials.json
+secrets/
